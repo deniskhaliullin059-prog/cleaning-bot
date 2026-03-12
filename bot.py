@@ -75,7 +75,8 @@ client = Groq(api_key=GROQ_API_KEY)
 conversations = {}
 
 def clean_text(text):
-    result = re.sub(r'[^\u0400-\u04FF0-9\s\.,!?:;\-\(\)\[\]\"\'%/\n\+\*@#№=]', '', text)
+    # Убираем только управляющие символы (кроме \n и \t), нормализуем пробелы
+    result = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
     result = re.sub(r' +', ' ', result)
     return result.strip()
 
