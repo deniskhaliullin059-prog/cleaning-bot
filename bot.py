@@ -75,7 +75,7 @@ client = Groq(api_key=GROQ_API_KEY)
 conversations = {}
 
 def clean_text(text):
-    result = re.sub(r'[^\u0400-\u04FF0-9\s\.,!?:;\-\(\)\[\]\"\'%/\n\+\*@#№]', '', text)
+    result = re.sub(r'[^\u0400-\u04FF0-9\s\.,!?:;\-\(\)\[\]\"\'%/\n\+\*@#№=]', '', text)
     result = re.sub(r' +', ' ', result)
     return result.strip()
 
@@ -471,7 +471,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as ex:
                 logger.error(f"Ошибка резервного извлечения: {ex}")
 
-        if data:
+        # Сохранять заявку только если есть хотя бы имя и телефон
+        if data and data.get("имя") and data.get("телефон") and data.get("имя") != "None" and data.get("телефон") != "None":
             admin_msg_id = await notify_admin(context.application, data, loyal=loyal)
             save_order(
                 user_id,
