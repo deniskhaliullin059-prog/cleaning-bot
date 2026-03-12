@@ -422,7 +422,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = update.effective_user.full_name or str(user_id)
     user_text = update.message.text
     if user_id not in conversations:
+        # Восстанавливаем историю из БД (последние 20 сообщений)
         conversations[user_id] = []
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute(
+            "SELECT direction, text FROM messages WHERE user_id=? ORDER BY id DESC LIMIT 20",
+            (user_id,)
+        )
+        rows = c.fetchall()
+        conn.close()
+        for direction, text in reversed(rows):
+            role = "user" if direction == "in" else "assistant"
+            conversations[user_id].append({"role": role, "content": text})
 
     # сохранить входящее сообщение
     save_message(user_id, user_name, "in", user_text)
