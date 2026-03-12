@@ -2,6 +2,8 @@ import sqlite3
 import json
 import requests
 import os
+import subprocess
+import sys
 from datetime import datetime, timedelta
 from flask import Flask, render_template, jsonify, request, Response, stream_with_context
 import queue
@@ -11,6 +13,13 @@ from dotenv import load_dotenv
 load_dotenv()
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "orders.db"))
+
+# Запускаем бота как фоновый процесс (для Railway где один сервис)
+def _start_bot():
+    bot_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bot.py")
+    subprocess.run([sys.executable, bot_path])
+
+threading.Thread(target=_start_bot, daemon=True).start()
 
 app = Flask(__name__)
 
