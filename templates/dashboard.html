@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Дашборд — ООО ВИД CRM{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+{% block page_title %}Дашборд{% endblock %}
+
+{% block content %}
+<!-- Карточки статистики -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+  <div class="stat-card flex items-center gap-4">
+    <div class="icon bg-indigo-50 text-indigo-600">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+      </svg>
+    </div>
+    <div>
+      <div class="value text-indigo-600" id="s-today">—</div>
+      <div class="label">Заявок сегодня</div>
+    </div>
+  </div>
+  <div class="stat-card flex items-center gap-4">
+    <div class="icon bg-blue-50 text-blue-600">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+      </svg>
+    </div>
+    <div>
+      <div class="value text-blue-600" id="s-week">—</div>
+      <div class="label">За неделю</div>
+    </div>
+  </div>
+  <div class="stat-card flex items-center gap-4">
+    <div class="icon bg-emerald-50 text-emerald-600">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+      </svg>
+    </div>
+    <div>
+      <div class="value text-emerald-600" id="s-clients">—</div>
+      <div class="label">Уникальных клиентов</div>
+    </div>
+  </div>
+  <div class="stat-card flex items-center gap-4">
+    <div class="icon bg-amber-50 text-amber-500">
+      <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+      </svg>
+    </div>
+    <div>
+      <div class="value text-amber-500" id="s-rating">—</div>
+      <div class="label">Средний рейтинг</div>
+    </div>
+  </div>
+</div>
+
+<!-- Статусы -->
+<div class="grid grid-cols-4 gap-3 mb-6" id="status-cards">
+  <div class="stat-card text-center">
+    <div class="text-2xl font-bold text-blue-600" id="st-new">—</div>
+    <div class="text-xs text-slate-500 mt-1">Новые</div>
+  </div>
+  <div class="stat-card text-center">
+    <div class="text-2xl font-bold text-amber-500" id="st-in_progress">—</div>
+    <div class="text-xs text-slate-500 mt-1">В работе</div>
+  </div>
+  <div class="stat-card text-center">
+    <div class="text-2xl font-bold text-emerald-600" id="st-done">—</div>
+    <div class="text-xs text-slate-500 mt-1">Выполнены</div>
+  </div>
+  <div class="stat-card text-center">
+    <div class="text-2xl font-bold text-red-500" id="st-cancelled">—</div>
+    <div class="text-xs text-slate-500 mt-1">Отменены</div>
+  </div>
+</div>
+
+<!-- Графики -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+  <div class="lg:col-span-2 bg-white rounded-xl p-5 shadow-sm">
+    <div class="font-semibold text-sm text-slate-700 mb-4">Заявки за последние 14 дней</div>
+    <canvas id="chart-days" height="100"></canvas>
+  </div>
+  <div class="bg-white rounded-xl p-5 shadow-sm">
+    <div class="font-semibold text-sm text-slate-700 mb-4">Популярные услуги</div>
+    <canvas id="chart-services" height="180"></canvas>
+  </div>
+</div>
+
+<!-- Последние заявки -->
+<div class="bg-white rounded-xl shadow-sm">
+  <div class="px-5 py-4 border-b border-slate-100 font-semibold text-sm text-slate-700">Последние заявки</div>
+  <div class="overflow-x-auto">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>#</th><th>Клиент</th><th>Услуга</th><th>Адрес</th><th>Дата</th><th>Статус</th><th>Оценка</th>
+        </tr>
+      </thead>
+      <tbody id="recent-tbody">
+        <tr><td colspan="7" class="text-center py-8 text-slate-400">Загрузка...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/dashboard.js"></script>
+{% endblock %}

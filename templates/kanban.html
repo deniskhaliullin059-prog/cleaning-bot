@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Канбан — ООО ВИД CRM{% endblock %}
+{% block page_title %}Канбан — заявки{% endblock %}
+
+{% block content %}
+<div class="flex gap-4 overflow-x-auto pb-4" id="kanban-board" style="min-height: calc(100vh - 160px);">
+
+  <!-- Колонка: Новые -->
+  <div class="kanban-col" id="col-new" data-status="new">
+    <div class="kanban-col-header bg-blue-50 text-blue-700">
+      <span class="w-3 h-3 rounded-full bg-blue-500 inline-block"></span>
+      Новые
+      <span class="ml-auto bg-blue-100 text-blue-700 text-xs rounded-full px-2 py-0.5 count-badge">0</span>
+    </div>
+    <div class="kanban-cards" id="cards-new"></div>
+  </div>
+
+  <!-- Колонка: В работе -->
+  <div class="kanban-col" id="col-in_progress" data-status="in_progress">
+    <div class="kanban-col-header bg-amber-50 text-amber-700">
+      <span class="w-3 h-3 rounded-full bg-amber-400 inline-block"></span>
+      В работе
+      <span class="ml-auto bg-amber-100 text-amber-700 text-xs rounded-full px-2 py-0.5 count-badge">0</span>
+    </div>
+    <div class="kanban-cards" id="cards-in_progress"></div>
+  </div>
+
+  <!-- Колонка: Выполнены -->
+  <div class="kanban-col" id="col-done" data-status="done">
+    <div class="kanban-col-header bg-emerald-50 text-emerald-700">
+      <span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span>
+      Выполнены
+      <span class="ml-auto bg-emerald-100 text-emerald-700 text-xs rounded-full px-2 py-0.5 count-badge">0</span>
+    </div>
+    <div class="kanban-cards" id="cards-done"></div>
+  </div>
+
+  <!-- Колонка: Отменены -->
+  <div class="kanban-col" id="col-cancelled" data-status="cancelled">
+    <div class="kanban-col-header bg-red-50 text-red-700">
+      <span class="w-3 h-3 rounded-full bg-red-400 inline-block"></span>
+      Отменены
+      <span class="ml-auto bg-red-100 text-red-700 text-xs rounded-full px-2 py-0.5 count-badge">0</span>
+    </div>
+    <div class="kanban-cards" id="cards-cancelled"></div>
+  </div>
+
+</div>
+
+<!-- Модальное окно карточки -->
+<div id="card-modal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 hidden">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6">
+    <div class="flex items-start justify-between mb-4">
+      <div>
+        <div class="font-bold text-lg" id="modal-name"></div>
+        <div class="text-sm text-slate-500" id="modal-service"></div>
+      </div>
+      <button id="modal-close" class="text-slate-400 hover:text-slate-700 text-xl leading-none">&times;</button>
+    </div>
+    <div class="space-y-2 text-sm">
+      <div class="flex gap-2"><span class="text-slate-500 w-20 shrink-0">Телефон:</span><span id="modal-phone" class="font-medium"></span></div>
+      <div class="flex gap-2"><span class="text-slate-500 w-20 shrink-0">Адрес:</span><span id="modal-address"></span></div>
+      <div class="flex gap-2"><span class="text-slate-500 w-20 shrink-0">Дата:</span><span id="modal-date"></span></div>
+      <div class="flex gap-2"><span class="text-slate-500 w-20 shrink-0">Создана:</span><span id="modal-created"></span></div>
+      <div class="flex gap-2"><span class="text-slate-500 w-20 shrink-0">Оценка:</span><span id="modal-rating"></span></div>
+    </div>
+    <div class="mt-5 border-t border-slate-100 pt-4">
+      <div class="text-xs text-slate-500 mb-2 font-medium">Изменить статус:</div>
+      <div class="flex gap-2 flex-wrap">
+        <button class="status-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-100 text-blue-700 hover:bg-blue-200" data-status="new">Новая</button>
+        <button class="status-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-100 text-amber-700 hover:bg-amber-200" data-status="in_progress">В работе</button>
+        <button class="status-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-100 text-emerald-700 hover:bg-emerald-200" data-status="done">Выполнена</button>
+        <button class="status-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-red-100 text-red-700 hover:bg-red-200" data-status="cancelled">Отменена</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/kanban.js"></script>
+{% endblock %}

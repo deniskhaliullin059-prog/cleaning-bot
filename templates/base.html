@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}ООО ВИД — CRM{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50:'#eef2ff', 100:'#e0e7ff', 500:'#4f46e5', 600:'#4338ca', 700:'#3730a3', 900:'#1e1b4b' },
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="/static/css/custom.css">
+  {% block head %}{% endblock %}
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex">
+
+  <!-- Боковая панель -->
+  <aside class="w-64 bg-brand-900 text-white flex flex-col shrink-0 min-h-screen">
+    <div class="px-6 py-5 border-b border-brand-700">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 bg-brand-500 rounded-lg flex items-center justify-center text-lg font-bold">В</div>
+        <div>
+          <div class="font-bold text-sm leading-tight">ООО ВИД</div>
+          <div class="text-xs text-brand-100 opacity-70">CRM система</div>
+        </div>
+      </div>
+    </div>
+    <nav class="flex-1 px-3 py-4 space-y-1">
+      <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+        </svg>
+        Дашборд
+      </a>
+      <a href="/chats" class="nav-link {% if request.path == '/chats' %}active{% endif %}">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+        </svg>
+        Чаты с клиентами
+        <span id="nav-badge" class="ml-auto bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 hidden">0</span>
+      </a>
+      <a href="/kanban" class="nav-link {% if request.path == '/kanban' %}active{% endif %}">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/>
+        </svg>
+        Канбан
+      </a>
+    </nav>
+    <div class="px-4 py-4 border-t border-brand-700 text-xs text-brand-100 opacity-50">
+      Профессиональный клининг<br>для бизнеса
+    </div>
+  </aside>
+
+  <!-- Основное содержимое -->
+  <main class="flex-1 flex flex-col overflow-hidden">
+    <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shrink-0">
+      <h1 class="text-lg font-semibold text-slate-800">{% block page_title %}{% endblock %}</h1>
+      <div class="flex items-center gap-3 text-sm text-slate-500">
+        <span id="clock"></span>
+        <div class="w-2 h-2 rounded-full bg-green-400" title="Бот онлайн"></div>
+        <span>Бот активен</span>
+      </div>
+    </header>
+    <div class="flex-1 overflow-auto p-6">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+
+  <script>
+    // Часы
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clock').textContent = now.toLocaleTimeString('ru-RU');
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
