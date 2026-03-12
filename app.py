@@ -14,14 +14,52 @@ load_dotenv()
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "orders.db"))
 
-# Запускаем бота как фоновый процесс (для Railway где один сервис)
+app = Flask(__name__)
+
+# Инициализируем БД при старте (нужно и под gunicorn)
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER, name TEXT, phone TEXT, service TEXT,
+            address TEXT, date TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            reminder_sent INTEGER DEFAULT 0,
+            admin_message_id INTEGER,
+            rating INTEGER DEFAULT NULL,
+            review_sent INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'new'
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER, user_name TEXT, direction TEXT,
+            text TEXT, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    for col in ["admin_message_id INTEGER", "rating INTEGER DEFAULT NULL",
+                "review_sent INTEGER DEFAULT 0", "status TEXT DEFAULT 'new'"]:
+        try:
+            c.execute(f"ALTER TABLE orders ADD COLUMN {col}")
+        except Exception:
+            pass
+    conn.commit()
+    conn.close()
+
+init_db()
+
+# Запускаем бота как фоновый процесс с авто-перезапуском
 def _start_bot():
+    import time
     bot_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bot.py")
-    subprocess.run([sys.executable, bot_path])
+    while True:
+        subprocess.run([sys.executable, bot_path])
+        time.sleep(10)  # пауза перед перезапуском (даёт время старому контейнеру остановиться)
 
 threading.Thread(target=_start_bot, daemon=True).start()
-
-app = Flask(__name__)
 
 # SSE очередь для уведомлений
 sse_clients = []
