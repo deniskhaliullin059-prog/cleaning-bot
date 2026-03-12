@@ -123,6 +123,13 @@
 .data-table tr:last-child td { border-bottom: none; }
 .data-table tr:hover td { background: #f8fafc; }
 
+/* Мобильная адаптация */
+@media (max-width: 640px) {
+  .stat-card { padding: 14px 16px; }
+  .stat-card .value { font-size: 1.5rem; }
+  .bubble { max-width: 88%; }
+}
+
 /* Scroll */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }

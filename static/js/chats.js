@@ -63,6 +63,9 @@ async function selectClient(userId) {
 
   await loadMessages(userId);
 
+  // на мобилке переключиться на панель чата
+  if (typeof showChat === 'function') showChat();
+
   // перезапустить поллинг
   if (pollInterval) clearInterval(pollInterval);
   pollInterval = setInterval(() => loadMessages(currentUserId), 3000);
