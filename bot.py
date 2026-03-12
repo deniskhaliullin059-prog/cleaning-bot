@@ -435,9 +435,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ] + conversations[user_id]
 
         response = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="mixtral-8x7b-32768",
             messages=messages,
-            max_tokens=800
+            max_tokens=1024
         )
         reply = response.choices[0].message.content
         conversations[user_id].append({"role": "assistant", "content": reply})
@@ -462,7 +462,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     )}
                 ]
                 extract_resp = client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
+                    model="mixtral-8x7b-32768",
                     messages=extract_messages,
                     max_tokens=150
                 )
