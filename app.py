@@ -10,7 +10,7 @@ import threading
 from dotenv import load_dotenv
 load_dotenv()
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
-DB_PATH = os.path.join(os.path.dirname(__file__), "orders.db")
+DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "orders.db"))
 
 app = Flask(__name__)
 

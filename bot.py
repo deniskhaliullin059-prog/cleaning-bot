@@ -13,6 +13,7 @@ load_dotenv()
 TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
 GROQ_API_KEY = os.environ["GROQ_API_KEY"]
 ADMIN_GROUP_ID = int(os.environ.get("ADMIN_GROUP_ID", "-5109857763"))
+DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "orders.db"))
 
 SYSTEM_PROMPT = (
     "Ты оператор клининговой компании ООО ВИД — профессиональный клининг для бизнеса и предприятий в Перми. "
@@ -79,7 +80,7 @@ def clean_text(text):
     return result.strip()
 
 def init_db():
-    conn = sqlite3.connect("orders.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
         CREATE TABLE IF NOT EXISTS orders (
@@ -124,7 +125,7 @@ def init_db():
     conn.close()
 
 def save_message(user_id, user_name, direction, text):
-    conn = sqlite3.connect("orders.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute(
         "INSERT INTO messages (user_id, user_name, direction, text) VALUES (?, ?, ?, ?)",
@@ -134,7 +135,7 @@ def save_message(user_id, user_name, direction, text):
     conn.close()
 
 def save_order(user_id, name, phone, service, address, date, admin_message_id=None):
-    conn = sqlite3.connect("orders.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute(
         "INSERT INTO orders (user_id, name, phone, service, address, date, admin_message_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'new')",
@@ -147,7 +148,7 @@ def save_order(user_id, name, phone, service, address, date, admin_message_id=No
     return order_id
 
 def get_order_by_message_id(message_id):
-    conn = sqlite3.connect("orders.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT * FROM orders WHERE admin_message_id=?", (message_id,))
     row = c.fetchone()
@@ -155,14 +156,14 @@ def get_order_by_message_id(message_id):
     return row
 
 def save_rating(order_id, rating):
-    conn = sqlite3.connect("orders.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("UPDATE orders SET rating=? WHERE id=?", (rating, order_id))
     conn.commit()
     conn.close()
 
 def get_today_orders():
-    conn = sqlite3.connect("orders.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     today = datetime.now().strftime("%Y-%m-%d")
     c.execute(
@@ -174,7 +175,7 @@ def get_today_orders():
     return rows
 
 def get_client_order_count(user_id):
-    conn = sqlite3.connect("orders.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM orders WHERE user_id=?", (user_id,))
     count = c.fetchone()[0]
@@ -240,7 +241,7 @@ async def cmd_accept(update: Update, context: ContextTypes.DEFAULT_TYPE):
     service = order[4]
     date = order[6]
     # обновить статус
-    conn = sqlite3.connect("orders.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("UPDATE orders SET status='in_progress' WHERE admin_message_id=?", (replied_id,))
     conn.commit()
@@ -276,7 +277,7 @@ async def cmd_done(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = order[2]
     service = order[4]
     # обновить статус
-    conn = sqlite3.connect("orders.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("UPDATE orders SET status='done' WHERE id=?", (order_id,))
     conn.commit()
@@ -360,7 +361,7 @@ async def send_reminders(app):
     while True:
         await asyncio.sleep(3600)
         try:
-            conn = sqlite3.connect("orders.db")
+            conn = sqlite3.connect(DB_PATH)
             c = conn.cursor()
             reminder_date = datetime.now() - timedelta(days=30)
             c.execute(
