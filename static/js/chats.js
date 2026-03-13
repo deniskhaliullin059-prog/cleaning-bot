@@ -170,6 +170,81 @@ evtSource.onmessage = async (e) => {
   }
 };
 
+// ─── Рассылка ─────────────────────────────────────────────────────────────────
+
+const TEMPLATES = {
+  promo: "Здравствуйте! 👋\n\nВ этом месяце ООО ВИД проводит акцию:\n✅ Скидка 15% на комплексную уборку при заказе до конца месяца.\n\nЗапишитесь прямо сейчас — просто напишите нам!",
+  reminder: "Здравствуйте! 😊\n\nПрошло время с последней уборки вашего объекта.\nПора поддержать чистоту?\n\nНапишите нам — подберём удобное время и выгодные условия.\nС уважением, ООО ВИД 🏢",
+  seasonal: "Здравствуйте! 🌿\n\nСезонная генеральная уборка — лучшее время обновить ваш офис или производство.\n\nООО ВИД готовы помочь: выезд, оборудование KARCHER, опытные специалисты.\n\nОставьте заявку — рассчитаем стоимость бесплатно!",
+};
+
+function openBroadcast() {
+  document.getElementById('broadcast-modal').classList.remove('hidden');
+  document.getElementById('broadcast-modal').classList.add('flex');
+  document.getElementById('broadcast-text').value = '';
+  document.getElementById('bc-result').textContent = '';
+  document.getElementById('bc-send-btn').disabled = false;
+  updateBroadcastCount();
+}
+
+function closeBroadcast() {
+  document.getElementById('broadcast-modal').classList.add('hidden');
+  document.getElementById('broadcast-modal').classList.remove('flex');
+}
+
+function setTemplate(key) {
+  document.getElementById('broadcast-text').value = TEMPLATES[key] || '';
+  clearBroadcastResult();
+}
+
+function clearBroadcastResult() {
+  document.getElementById('bc-result').textContent = '';
+}
+
+async function updateBroadcastCount() {
+  const activeOnly = document.querySelector('input[name="bc-filter"]:checked').value === 'active';
+  const res = await fetch(`/api/broadcast/count?active_only=${activeOnly}`);
+  const d = await res.json();
+  document.getElementById('bc-count').textContent = `Будет отправлено: ${d.count} клиентам`;
+}
+
+async function sendBroadcast() {
+  const text = document.getElementById('broadcast-text').value.trim();
+  if (!text) {
+    document.getElementById('bc-result').innerHTML = '<span class="text-red-500">Введите текст сообщения</span>';
+    return;
+  }
+  const activeOnly = document.querySelector('input[name="bc-filter"]:checked').value === 'active';
+  const btn = document.getElementById('bc-send-btn');
+  btn.disabled = true;
+  btn.textContent = 'Отправляю...';
+  document.getElementById('bc-result').textContent = '';
+
+  try {
+    const res = await fetch('/api/broadcast', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, active_only: activeOnly }),
+    });
+    const d = await res.json();
+    if (d.ok) {
+      const resultEl = document.getElementById('bc-result');
+      resultEl.innerHTML = `<span class="text-green-600 font-medium">Отправлено: ${d.sent}</span>`
+        + (d.failed ? `<span class="text-red-500 ml-2">Ошибок: ${d.failed}</span>` : '');
+      btn.textContent = 'Готово';
+      await loadClients();
+    } else {
+      document.getElementById('bc-result').innerHTML = `<span class="text-red-500">${d.error}</span>`;
+      btn.disabled = false;
+      btn.textContent = 'Отправить';
+    }
+  } catch (e) {
+    document.getElementById('bc-result').innerHTML = '<span class="text-red-500">Ошибка сети</span>';
+    btn.disabled = false;
+    btn.textContent = 'Отправить';
+  }
+}
+
 // ─── Инициализация ────────────────────────────────────────────────────────────
 
 loadClients();

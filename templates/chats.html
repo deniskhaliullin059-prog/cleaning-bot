@@ -7,9 +7,18 @@
 
   <!-- Левая панель: список клиентов -->
   <div id="clients-panel" class="w-full md:w-72 border-r border-slate-200 flex flex-col shrink-0">
-    <div class="px-4 py-3 border-b border-slate-100">
-      <input id="search-input" type="text" placeholder="Поиск клиента..."
-        class="w-full bg-slate-100 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400">
+    <div class="px-4 py-3 border-b border-slate-100 space-y-2">
+      <div class="flex gap-2">
+        <input id="search-input" type="text" placeholder="Поиск клиента..."
+          class="flex-1 bg-slate-100 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400 min-w-0">
+        <button onclick="openBroadcast()" title="Рассылка"
+          class="shrink-0 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg px-2.5 py-2 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
+          </svg>
+        </button>
+      </div>
     </div>
     <div id="clients-list" class="flex-1 overflow-y-auto">
       <div class="text-center py-10 text-slate-400 text-sm">Загрузка...</div>
@@ -51,6 +60,61 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
         </svg>
       </button>
+    </div>
+  </div>
+</div>
+<!-- Модальное окно рассылки -->
+<div id="broadcast-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md">
+    <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+      <h3 class="font-semibold text-slate-800">Рассылка клиентам</h3>
+      <button onclick="closeBroadcast()" class="text-slate-400 hover:text-slate-600 transition">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    <div class="px-6 py-4 space-y-4">
+      <!-- Шаблоны -->
+      <div>
+        <div class="text-xs text-slate-500 mb-2">Быстрые шаблоны</div>
+        <div class="flex flex-wrap gap-2">
+          <button onclick="setTemplate('promo')" class="text-xs bg-slate-100 hover:bg-indigo-100 hover:text-indigo-700 text-slate-600 px-3 py-1.5 rounded-lg transition">Акция месяца</button>
+          <button onclick="setTemplate('reminder')" class="text-xs bg-slate-100 hover:bg-indigo-100 hover:text-indigo-700 text-slate-600 px-3 py-1.5 rounded-lg transition">Напоминание</button>
+          <button onclick="setTemplate('seasonal')" class="text-xs bg-slate-100 hover:bg-indigo-100 hover:text-indigo-700 text-slate-600 px-3 py-1.5 rounded-lg transition">Сезонная уборка</button>
+        </div>
+      </div>
+      <!-- Текст -->
+      <div>
+        <label class="text-xs font-medium text-slate-700 mb-1.5 block">Текст сообщения</label>
+        <textarea id="broadcast-text" rows="5" placeholder="Введите текст рассылки..."
+          oninput="clearBroadcastResult()"
+          class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-400 resize-none"></textarea>
+      </div>
+      <!-- Фильтр -->
+      <div class="flex gap-6">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="radio" name="bc-filter" value="active" checked onchange="updateBroadcastCount()" class="accent-indigo-600">
+          <span class="text-sm text-slate-700">Активные (6 мес)</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="radio" name="bc-filter" value="all" onchange="updateBroadcastCount()" class="accent-indigo-600">
+          <span class="text-sm text-slate-700">Все клиенты</span>
+        </label>
+      </div>
+      <!-- Счётчик -->
+      <div id="bc-count" class="text-sm text-slate-500"></div>
+    </div>
+    <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between gap-3">
+      <div id="bc-result" class="text-sm min-w-0"></div>
+      <div class="flex gap-2 shrink-0">
+        <button onclick="closeBroadcast()"
+          class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition">Отмена</button>
+        <button id="bc-send-btn" onclick="sendBroadcast()"
+          class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed">
+          Отправить
+        </button>
+      </div>
     </div>
   </div>
 </div>

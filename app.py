@@ -420,6 +420,70 @@ def api_update_status(order_id):
     return jsonify({"ok": True})
 
 
+# ─── API: Рассылка ────────────────────────────────────────────────────────────
+
+@app.route("/api/broadcast/count")
+@login_required
+def api_broadcast_count():
+    active_only = request.args.get("active_only", "true") == "true"
+    conn = get_db()
+    c = conn.cursor()
+    if active_only:
+        cutoff = (datetime.now() - timedelta(days=180)).strftime("%Y-%m-%d")
+        c.execute("SELECT COUNT(DISTINCT user_id) FROM messages WHERE timestamp >= ?", (cutoff,))
+    else:
+        c.execute("SELECT COUNT(DISTINCT user_id) FROM messages")
+    count = c.fetchone()[0]
+    conn.close()
+    return jsonify({"count": count})
+
+
+@app.route("/api/broadcast", methods=["POST"])
+@login_required
+def api_broadcast():
+    data = request.get_json()
+    text = data.get("text", "").strip()
+    active_only = data.get("active_only", True)
+
+    if not text:
+        return jsonify({"ok": False, "error": "Пустое сообщение"}), 400
+
+    conn = get_db()
+    c = conn.cursor()
+    if active_only:
+        cutoff = (datetime.now() - timedelta(days=180)).strftime("%Y-%m-%d")
+        c.execute("SELECT DISTINCT user_id FROM messages WHERE timestamp >= ?", (cutoff,))
+    else:
+        c.execute("SELECT DISTINCT user_id FROM messages")
+    user_ids = [r["user_id"] for r in c.fetchall()]
+    conn.close()
+
+    sent = 0
+    failed = 0
+    tg_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    for uid in user_ids:
+        resp = requests.post(tg_url, json={"chat_id": uid, "text": text})
+        if resp.ok:
+            sent += 1
+            conn = get_db()
+            conn.execute(
+                "INSERT INTO messages (user_id, user_name, direction, text, timestamp) VALUES (?, ?, ?, ?, ?)",
+                (uid, "ООО ВИД", "out", text, ts)
+            )
+            conn.commit()
+            conn.close()
+            push_sse_event(json.dumps({
+                "type": "message", "user_id": uid,
+                "direction": "out", "text": text, "timestamp": ts,
+            }))
+        else:
+            failed += 1
+
+    return jsonify({"ok": True, "sent": sent, "failed": failed, "total": len(user_ids)})
+
+
 # ─── SSE: Уведомления ─────────────────────────────────────────────────────────
 
 @app.route("/api/events")
