@@ -133,17 +133,19 @@ def push_sse_event(data):
 
 @app.route("/debug-env-keys")
 def debug_env_keys():
-    keys = sorted(k for k in os.environ.keys() if not k.startswith("TELEGRAM") and not k.startswith("GROQ"))
-    return jsonify({"env_keys": keys, "crm_set": bool(os.environ.get("CRM_PASSWORD"))})
+    keys = sorted(os.environ.keys())
+    return jsonify({
+        "env_keys": keys,
+        "crm_password_set": "CRM_PASSWORD" in os.environ,
+        "crm_pass_set": "CRM_PASS" in os.environ,
+    })
 
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     error = None
     if request.method == "POST":
-        crm_password = os.environ.get("CRM_PASSWORD", "admin")
-        import sys
-        print(f"DEBUG login: CRM_PASSWORD={'[SET len=' + str(len(crm_password)) + ']' if crm_password != 'admin' else '[DEFAULT=admin]'}", flush=True, file=sys.stderr)
+        crm_password = os.environ.get("CRM_PASS") or os.environ.get("CRM_PASSWORD") or "admin"
         if request.form.get("password") == crm_password:
             session["logged_in"] = True
             return redirect(url_for("dashboard"))
