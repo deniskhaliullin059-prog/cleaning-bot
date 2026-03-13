@@ -17,7 +17,6 @@ DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(os.path.abspath
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-in-prod")
-CRM_PASSWORD = os.environ.get("CRM_PASSWORD", "admin")
 
 
 def login_required(f):
@@ -136,7 +135,8 @@ def push_sse_event(data):
 def login():
     error = None
     if request.method == "POST":
-        if request.form.get("password") == CRM_PASSWORD:
+        crm_password = os.environ.get("CRM_PASSWORD", "admin")
+        if request.form.get("password") == crm_password:
             session["logged_in"] = True
             return redirect(url_for("dashboard"))
         error = "Неверный пароль"
