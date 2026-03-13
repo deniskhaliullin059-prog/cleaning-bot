@@ -373,23 +373,60 @@ async def send_reminders(app):
         try:
             conn = sqlite3.connect(DB_PATH)
             c = conn.cursor()
-            reminder_date = datetime.now() - timedelta(days=30)
-            c.execute(
-                "SELECT id, user_id, name, service FROM orders WHERE reminder_sent=0 AND created_at <= ?",
-                (reminder_date,)
-            )
+            reminder_from = (datetime.now() - timedelta(days=35)).strftime("%Y-%m-%d")
+            reminder_to = (datetime.now() - timedelta(days=28)).strftime("%Y-%m-%d")
+            # Одно напоминание на клиента: только по его последней заявке
+            c.execute("""
+                SELECT id, user_id, name, service, created_at
+                FROM orders
+                WHERE reminder_sent = 0
+                  AND created_at BETWEEN ? AND ?
+                  AND id IN (SELECT MAX(id) FROM orders GROUP BY user_id)
+            """, (reminder_from, reminder_to))
             rows = c.fetchall()
             for row in rows:
-                order_id, user_id, name, service = row
+                order_id, user_id, name, service, _ = row
+                # Все даты заказов клиента
+                c.execute("SELECT created_at FROM orders WHERE user_id=? ORDER BY id ASC", (user_id,))
+                all_dates_raw = [r[0] for r in c.fetchall()]
+                order_count = len(all_dates_raw)
                 try:
-                    msg_text = (
-                        f"Здравствуйте, {name}! 👋\n\n"
-                        f"Прошёл месяц с момента последней уборки ({service}).\n"
-                        "Пора поддержать чистоту на объекте? 😊\n\n"
-                        "Напишите нам — подберём удобное время и выгодные условия!\n"
-                        "С уважением, ООО ВИД"
-                    )
-                    await app.bot.send_message(chat_id=user_id, text=msg_text)
+                    if order_count >= 3:
+                        # Вычислить средний интервал между заказами
+                        dates = []
+                        for d in all_dates_raw:
+                            try:
+                                dates.append(datetime.fromisoformat(str(d)[:10]))
+                            except Exception:
+                                pass
+                        if len(dates) >= 2:
+                            intervals = [(dates[i+1] - dates[i]).days for i in range(len(dates)-1)]
+                            avg_days = max(7, sum(intervals) // len(intervals))
+                            next_date = dates[-1] + timedelta(days=avg_days)
+                            next_date_str = next_date.strftime("%d.%m.%Y")
+                            date_line = f"Судя по вашему графику, следующая уборка — около {next_date_str}.\n"
+                        else:
+                            date_line = f"Прошёл месяц с последней уборки ({service}).\n"
+                        keyboard = InlineKeyboardMarkup([[
+                            InlineKeyboardButton("✅ Записаться", callback_data="book_new")
+                        ]])
+                        msg_text = (
+                            f"Здравствуйте, {name}! 👋\n\n"
+                            f"Вы уже {order_count} раз доверяли нам уборку — спасибо за доверие! ⭐\n\n"
+                            f"{date_line}"
+                            "Забронировать заранее?\n\n"
+                            "С уважением, ООО ВИД 🏢"
+                        )
+                        await app.bot.send_message(chat_id=user_id, text=msg_text, reply_markup=keyboard)
+                    else:
+                        msg_text = (
+                            f"Здравствуйте, {name}! 👋\n\n"
+                            f"Прошёл месяц с момента последней уборки ({service}).\n"
+                            "Пора поддержать чистоту на объекте? 😊\n\n"
+                            "Напишите нам — подберём удобное время и выгодные условия!\n"
+                            "С уважением, ООО ВИД"
+                        )
+                        await app.bot.send_message(chat_id=user_id, text=msg_text)
                     save_message(user_id, "ООО ВИД", "out", msg_text)
                     c.execute("UPDATE orders SET reminder_sent=1 WHERE id=?", (order_id,))
                     conn.commit()
@@ -398,6 +435,18 @@ async def send_reminders(app):
             conn.close()
         except Exception as e:
             logger.error(f"Ошибка проверки напоминаний: {e}")
+
+async def handle_book_new(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = update.effective_user.id
+    conversations[user_id] = []
+    await query.edit_message_reply_markup(reply_markup=None)
+    await context.bot.send_message(
+        chat_id=user_id,
+        text="Отлично! Давайте оформим заявку. 🏢\nКакая услуга вас интересует на этот раз?"
+    )
+
 
 async def post_init(app):
     asyncio.create_task(send_reminders(app))
@@ -542,6 +591,7 @@ def main():
     app.add_handler(CommandHandler("accept", cmd_accept))
     app.add_handler(CommandHandler("done", cmd_done))
     app.add_handler(CommandHandler("report", cmd_report))
+    app.add_handler(CallbackQueryHandler(handle_book_new, pattern=r"^book_new$"))
     app.add_handler(CallbackQueryHandler(handle_rating, pattern=r"^rate_"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     logger.info("ООО ВИД бот запущен!")
