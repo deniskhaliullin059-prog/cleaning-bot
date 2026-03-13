@@ -75,6 +75,12 @@ logger = logging.getLogger(__name__)
 
 client = Groq(api_key=GROQ_API_KEY)
 conversations = {}
+night_notified = set()  # user_ids, получившие ночное уведомление в текущей сессии
+
+
+def is_night_hours():
+    hour = datetime.now().hour
+    return hour >= 20 or hour < 9
 
 def clean_text(text):
     # Убираем управляющие символы и нежелательные скрипты (CJK, арабский, хинди и др.)
@@ -571,6 +577,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         clean_reply = reply.split("ЗАЯВКА_ПРИНЯТА:")[0].strip()
         clean_reply = clean_text(clean_reply)
+        # Ночное уведомление — только первый раз за сессию
+        if is_night_hours() and user_id not in night_notified:
+            clean_reply += "\n\n🌙 Ваш запрос принят. Менеджер ответит с 9:00."
+            night_notified.add(user_id)
         # сохранить исходящее сообщение
         save_message(user_id, "ООО ВИД", "out", clean_reply)
         await update.message.reply_text(clean_reply)

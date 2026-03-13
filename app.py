@@ -298,19 +298,27 @@ def api_clients():
                m.user_name,
                MAX(m.timestamp) as last_time,
                (SELECT text FROM messages m2 WHERE m2.user_id = m.user_id ORDER BY m2.id DESC LIMIT 1) as last_msg,
-               COUNT(CASE WHEN m.direction='in' THEN 1 END) as in_count
+               COUNT(CASE WHEN m.direction='in' THEN 1 END) as in_count,
+               CAST(strftime('%H', (
+                   SELECT timestamp FROM messages m3
+                   WHERE m3.user_id = m.user_id AND m3.direction='in'
+                   ORDER BY m3.id DESC LIMIT 1
+               )) AS INTEGER) as last_in_hour
         FROM messages m
         GROUP BY m.user_id
         ORDER BY last_time DESC
     """)
     clients = []
     for r in c.fetchall():
+        h = r["last_in_hour"]
+        night_lead = h is not None and (h >= 20 or h < 9)
         clients.append({
             "user_id": r["user_id"],
             "user_name": r["user_name"],
             "last_time": r["last_time"],
             "last_msg": r["last_msg"],
             "in_count": r["in_count"],
+            "night_lead": night_lead,
         })
     conn.close()
     return jsonify(clients)
