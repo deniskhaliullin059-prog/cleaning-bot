@@ -64,7 +64,7 @@ SYSTEM_PROMPT = (
     "Шаг 5 - спроси контактное лицо (имя и должность). "
     "Шаг 6 - спроси номер телефона. "
     "Шаг 7 - повтори заявку и сообщи что менеджер свяжется в течение 30 минут для подтверждения. "
-    "В конце сообщения на отдельной строке добавь: ЗАЯВКА_ПРИНЯТА: имя=[имя], телефон=[телефон], услуга=[услуга], адрес=[адрес], дата=[дата] "
+    "В конце сообщения на отдельной строке добавь: ЗАЯВКА_ПРИНЯТА: имя=[имя], телефон=[телефон], услуга=[услуга], адрес=[адрес], дата=[дата], цена=[итоговая стоимость числом в рублях без знака рубля] "
     "КРИТИЧЕСКИ ВАЖНО: добавляй метку ЗАЯВКА_ПРИНЯТА ТОЛЬКО если у тебя есть ВСЕ данные: реальное имя, реальный номер телефона (цифры), адрес, услуга и дата. "
     "Если хотя бы одно поле не заполнено — НЕ добавляй метку ЗАЯВКА_ПРИНЯТА, а задай уточняющий вопрос. "
     "ВАЖНО: не пропускай шаги 5 и 6! Задавай строго по одному вопросу за раз."
@@ -101,7 +101,8 @@ def init_db():
             admin_message_id INTEGER,
             rating INTEGER DEFAULT NULL,
             review_sent INTEGER DEFAULT 0,
-            status TEXT DEFAULT 'new'
+            status TEXT DEFAULT 'new',
+            price REAL DEFAULT NULL
         )
     """)
     c.execute("""
@@ -119,7 +120,8 @@ def init_db():
         "admin_message_id INTEGER",
         "rating INTEGER DEFAULT NULL",
         "review_sent INTEGER DEFAULT 0",
-        "status TEXT DEFAULT 'new'"
+        "status TEXT DEFAULT 'new'",
+        "price REAL DEFAULT NULL",
     ]
     for col in migrations:
         try:
@@ -139,12 +141,12 @@ def save_message(user_id, user_name, direction, text):
     conn.commit()
     conn.close()
 
-def save_order(user_id, name, phone, service, address, date, admin_message_id=None):
+def save_order(user_id, name, phone, service, address, date, admin_message_id=None, price=None):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute(
-        "INSERT INTO orders (user_id, name, phone, service, address, date, admin_message_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, 'new')",
-        (user_id, name, phone, service, address, date, admin_message_id)
+        "INSERT INTO orders (user_id, name, phone, service, address, date, admin_message_id, status, price) VALUES (?, ?, ?, ?, ?, ?, ?, 'new', ?)",
+        (user_id, name, phone, service, address, date, admin_message_id, price)
     )
     order_id = c.lastrowid
     conn.commit()
@@ -211,6 +213,8 @@ def parse_order(text, user_id):
 
 async def notify_admin(app, data, loyal=False):
     loyal_text = "⭐ ПОСТОЯННЫЙ КЛИЕНТ — скидка 10%\n" if loyal else ""
+    price_val = data.get("цена", "")
+    price_text = f"💰 Стоимость: {price_val} руб.\n" if price_val else ""
     text = (
         "🏢 НОВАЯ ЗАЯВКА — ООО ВИД\n\n"
         f"{loyal_text}"
@@ -218,7 +222,8 @@ async def notify_admin(app, data, loyal=False):
         f"📞 Телефон: {data.get('телефон', '')}\n"
         f"🏠 Адрес объекта: {data.get('адрес', '')}\n"
         f"🛠 Услуга: {data.get('услуга', '')}\n"
-        f"📅 Дата и время: {data.get('дата', '')}\n\n"
+        f"📅 Дата и время: {data.get('дата', '')}\n"
+        f"{price_text}\n"
         "⏰ Свяжитесь с клиентом в течение 30 минут!\n\n"
         "✅ /accept — принять заявку\n"
         "🏁 /done — работы выполнены"
@@ -494,6 +499,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         name_val = data.get("имя", "") if data else ""
         name_ok = bool(name_val) and name_val not in ("None", "", "[не указан]", "не указан")
         if data and name_ok and phone_has_digits:
+            # Извлечь цену из данных заявки
+            price_val = None
+            price_str = data.get("цена", "")
+            if price_str:
+                m = re.search(r'\d[\d\s]*', str(price_str))
+                if m:
+                    try:
+                        price_val = float(m.group().replace(" ", ""))
+                    except ValueError:
+                        pass
             admin_msg_id = await notify_admin(context.application, data, loyal=loyal)
             save_order(
                 user_id,
@@ -502,7 +517,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 data.get("услуга", ""),
                 data.get("адрес", ""),
                 data.get("дата", ""),
-                admin_msg_id
+                admin_msg_id,
+                price_val,
             )
         clean_reply = reply.split("ЗАЯВКА_ПРИНЯТА:")[0].strip()
         clean_reply = clean_text(clean_reply)

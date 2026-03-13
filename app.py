@@ -53,7 +53,8 @@ def init_db():
         )
     """)
     for col in ["admin_message_id INTEGER", "rating INTEGER DEFAULT NULL",
-                "review_sent INTEGER DEFAULT 0", "status TEXT DEFAULT 'new'"]:
+                "review_sent INTEGER DEFAULT 0", "status TEXT DEFAULT 'new'",
+                "price REAL DEFAULT NULL"]:
         try:
             c.execute(f"ALTER TABLE orders ADD COLUMN {col}")
         except Exception:
@@ -102,7 +103,8 @@ def init_db():
         )
     """)
     for col in ["admin_message_id INTEGER", "rating INTEGER DEFAULT NULL",
-                "review_sent INTEGER DEFAULT 0", "status TEXT DEFAULT 'new'"]:
+                "review_sent INTEGER DEFAULT 0", "status TEXT DEFAULT 'new'",
+                "price REAL DEFAULT NULL"]:
         try:
             c.execute(f"ALTER TABLE orders ADD COLUMN {col}")
         except Exception:
@@ -203,6 +205,24 @@ def api_stats():
     avg_rating = c.fetchone()[0]
     avg_rating = round(avg_rating, 1) if avg_rating else 0
 
+    # Выручка сегодня
+    c.execute("SELECT COALESCE(SUM(price), 0) FROM orders WHERE created_at >= ? AND price IS NOT NULL", (today,))
+    today_revenue = int(c.fetchone()[0])
+
+    # Выручка за месяц
+    c.execute("SELECT COALESCE(SUM(price), 0) FROM orders WHERE created_at >= ? AND price IS NOT NULL", (month_ago,))
+    month_revenue = int(c.fetchone()[0])
+
+    # Выручка по дням (последние 14 дней)
+    c.execute("""
+        SELECT DATE(created_at) as day, COALESCE(SUM(price), 0) as revenue
+        FROM orders
+        WHERE created_at >= DATE('now', '-14 days')
+        GROUP BY DATE(created_at)
+        ORDER BY day
+    """)
+    revenue_data = [{"day": r["day"], "revenue": r["revenue"]} for r in c.fetchall()]
+
     # Заявки по дням (последние 14 дней)
     c.execute("""
         SELECT DATE(created_at) as day, COUNT(*) as cnt
@@ -255,6 +275,9 @@ def api_stats():
         "total_count": total_count,
         "clients_count": clients_count,
         "avg_rating": avg_rating,
+        "today_revenue": today_revenue,
+        "month_revenue": month_revenue,
+        "revenue_data": revenue_data,
         "days_data": days_data,
         "services_data": services_data,
         "statuses": statuses,
