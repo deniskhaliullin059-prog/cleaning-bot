@@ -93,7 +93,7 @@ function renderMessages(msgs) {
     return `
       <div class="bubble-wrap ${dir}">
         <div class="text-xs text-slate-400 px-1">${senderLabel}</div>
-        <div class="bubble ${dir}">${escapeHtml(m.text)}</div>
+        <div class="bubble ${dir}">${renderMessageContent(m.text)}</div>
         <div class="bubble-time">${time}</div>
       </div>
     `;
@@ -104,6 +104,14 @@ function renderMessages(msgs) {
 
 function escapeHtml(str) {
   return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+function renderMessageContent(text) {
+  const m = (text || '').match(/^\[photo:(.+)\]$/);
+  if (m) {
+    return `<img src="/api/photo/${m[1]}" class="rounded-xl max-w-[220px] cursor-pointer block" loading="lazy" onclick="window.open('/api/photo/${m[1]}')">`;
+  }
+  return escapeHtml(text);
 }
 
 // ─── Отправка сообщения ───────────────────────────────────────────────────────

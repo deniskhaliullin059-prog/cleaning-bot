@@ -452,6 +452,29 @@ def api_update_status(order_id):
     return jsonify({"ok": True})
 
 
+# ─── API: Фото ────────────────────────────────────────────────────────────────
+
+@app.route("/api/photo/<file_id>")
+@login_required
+def api_photo(file_id):
+    info = requests.get(
+        f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getFile",
+        params={"file_id": file_id}, timeout=10
+    )
+    if not info.ok:
+        return "Not found", 404
+    file_path = info.json().get("result", {}).get("file_path")
+    if not file_path:
+        return "Not found", 404
+    img = requests.get(
+        f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{file_path}", timeout=15
+    )
+    if not img.ok:
+        return "Not found", 404
+    content_type = img.headers.get("Content-Type", "image/jpeg")
+    return Response(img.content, mimetype=content_type)
+
+
 # ─── API: Расписание ──────────────────────────────────────────────────────────
 
 @app.route("/api/schedule")

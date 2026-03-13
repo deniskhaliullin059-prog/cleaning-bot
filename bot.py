@@ -588,6 +588,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Oshibka: {e}")
         await update.message.reply_text("Произошла ошибка. Попробуйте ещё раз.")
 
+async def handle_photo(update: Update, _context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.id == ADMIN_GROUP_ID:
+        return
+    user_id = update.effective_user.id
+    user_name = update.effective_user.full_name or str(user_id)
+    photo = update.message.photo[-1]  # наибольшее разрешение
+    file_id = photo.file_id
+    caption = update.message.caption or ""
+    save_message(user_id, user_name, "in", f"[photo:{file_id}]")
+    if caption:
+        save_message(user_id, user_name, "in", caption)
+    reply = "Фото получено! 📸 Менеджер рассмотрит объект и свяжется с вами."
+    save_message(user_id, "ООО ВИД", "out", reply)
+    await update.message.reply_text(reply)
+
+
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     conversations[user_id] = []
@@ -603,6 +619,7 @@ def main():
     app.add_handler(CommandHandler("report", cmd_report))
     app.add_handler(CallbackQueryHandler(handle_book_new, pattern=r"^book_new$"))
     app.add_handler(CallbackQueryHandler(handle_rating, pattern=r"^rate_"))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     logger.info("ООО ВИД бот запущен!")
     app.run_polling()
