@@ -145,7 +145,7 @@ def debug_env_keys():
 def login():
     error = None
     if request.method == "POST":
-        crm_password = os.environ.get("CRM_PASS") or os.environ.get("CRM_PASSWORD") or "admin"
+        crm_password = os.environ.get("CRM_PASS") or os.environ.get("CRM_PASSWORD") or "vid2026"
         if request.form.get("password") == crm_password:
             session["logged_in"] = True
             return redirect(url_for("dashboard"))
