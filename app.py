@@ -5,9 +5,10 @@ import os
 import subprocess
 import sys
 from datetime import datetime, timedelta
-from flask import Flask, render_template, jsonify, request, Response, stream_with_context
+from flask import Flask, render_template, jsonify, request, Response, stream_with_context, session, redirect, url_for
 import queue
 import threading
+import functools
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -15,6 +16,18 @@ TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "orders.db"))
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-in-prod")
+CRM_PASSWORD = os.environ.get("CRM_PASSWORD", "admin")
+
+
+def login_required(f):
+    @functools.wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("logged_in"):
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated
+
 
 # Инициализируем БД при старте (нужно и под gunicorn)
 def init_db():
@@ -117,19 +130,41 @@ def push_sse_event(data):
             sse_clients.remove(q)
 
 
+# ─── Авторизация ──────────────────────────────────────────────────────────────
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = None
+    if request.method == "POST":
+        if request.form.get("password") == CRM_PASSWORD:
+            session["logged_in"] = True
+            return redirect(url_for("dashboard"))
+        error = "Неверный пароль"
+    return render_template("login.html", error=error)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
 # ─── Страницы ─────────────────────────────────────────────────────────────────
 
 @app.route("/")
+@login_required
 def dashboard():
     return render_template("dashboard.html")
 
 
 @app.route("/chats")
+@login_required
 def chats():
     return render_template("chats.html")
 
 
 @app.route("/kanban")
+@login_required
 def kanban():
     return render_template("kanban.html")
 
@@ -137,6 +172,7 @@ def kanban():
 # ─── API: Статистика ──────────────────────────────────────────────────────────
 
 @app.route("/api/stats")
+@login_required
 def api_stats():
     conn = get_db()
     c = conn.cursor()
@@ -228,6 +264,7 @@ def api_stats():
 # ─── API: Чаты ────────────────────────────────────────────────────────────────
 
 @app.route("/api/clients")
+@login_required
 def api_clients():
     conn = get_db()
     c = conn.cursor()
@@ -255,6 +292,7 @@ def api_clients():
 
 
 @app.route("/api/messages/<int:user_id>")
+@login_required
 def api_messages(user_id):
     conn = get_db()
     c = conn.cursor()
@@ -278,6 +316,7 @@ def api_messages(user_id):
 
 
 @app.route("/api/send/<int:user_id>", methods=["POST"])
+@login_required
 def api_send(user_id):
     data = request.get_json()
     text = data.get("text", "").strip()
@@ -315,6 +354,7 @@ def api_send(user_id):
 # ─── API: Канбан ──────────────────────────────────────────────────────────────
 
 @app.route("/api/orders")
+@login_required
 def api_orders():
     conn = get_db()
     c = conn.cursor()
@@ -341,6 +381,7 @@ def api_orders():
 
 
 @app.route("/api/orders/<int:order_id>/status", methods=["PATCH"])
+@login_required
 def api_update_status(order_id):
     data = request.get_json()
     new_status = data.get("status")
@@ -358,6 +399,7 @@ def api_update_status(order_id):
 # ─── SSE: Уведомления ─────────────────────────────────────────────────────────
 
 @app.route("/api/events")
+@login_required
 def api_events():
     q = queue.Queue(maxsize=50)
     with sse_lock:
