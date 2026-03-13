@@ -131,6 +131,12 @@ def push_sse_event(data):
 
 # ─── Авторизация ──────────────────────────────────────────────────────────────
 
+@app.route("/debug-env-keys")
+def debug_env_keys():
+    keys = sorted(k for k in os.environ.keys() if not k.startswith("TELEGRAM") and not k.startswith("GROQ"))
+    return jsonify({"env_keys": keys, "crm_set": bool(os.environ.get("CRM_PASSWORD"))})
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     error = None
