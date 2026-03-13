@@ -189,6 +189,12 @@ def kanban():
     return render_template("kanban.html")
 
 
+@app.route("/schedule")
+@login_required
+def schedule():
+    return render_template("schedule.html")
+
+
 # ─── API: Статистика ──────────────────────────────────────────────────────────
 
 @app.route("/api/stats")
@@ -444,6 +450,48 @@ def api_update_status(order_id):
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
+
+
+# ─── API: Расписание ──────────────────────────────────────────────────────────
+
+@app.route("/api/schedule")
+@login_required
+def api_schedule():
+    conn = get_db()
+    c = conn.cursor()
+    today = datetime.now().strftime("%Y-%m-%d")
+    # Все активные заявки (new + in_progress) + выполненные созданные сегодня
+    c.execute("""
+        SELECT id, user_id, name, phone, service, address, date, status,
+               rating, created_at, executor, price
+        FROM orders
+        WHERE status IN ('new', 'in_progress')
+           OR (status = 'done' AND created_at >= ?)
+        ORDER BY
+            CASE status WHEN 'in_progress' THEN 0 WHEN 'new' THEN 1 ELSE 2 END,
+            created_at ASC
+    """, (today,))
+    orders = []
+    for r in c.fetchall():
+        orders.append({
+            "id": r["id"], "name": r["name"], "phone": r["phone"],
+            "service": r["service"], "address": r["address"], "date": r["date"],
+            "status": r["status"] or "new", "rating": r["rating"],
+            "created_at": r["created_at"], "executor": r["executor"],
+            "price": r["price"],
+        })
+    # Статистика дня
+    c.execute("SELECT COUNT(*) FROM orders WHERE created_at >= ?", (today,))
+    created_today = c.fetchone()[0]
+    c.execute("SELECT COUNT(*) FROM orders WHERE status='in_progress'")
+    in_progress = c.fetchone()[0]
+    c.execute("SELECT COUNT(*) FROM orders WHERE status='done' AND created_at >= ?", (today,))
+    done_today = c.fetchone()[0]
+    conn.close()
+    return jsonify({
+        "orders": orders,
+        "stats": {"created_today": created_today, "in_progress": in_progress, "done_today": done_today},
+    })
 
 
 # ─── API: Сотрудники ──────────────────────────────────────────────────────────

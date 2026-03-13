@@ -62,6 +62,12 @@
         </svg>
         Канбан
       </a>
+      <a href="/schedule" class="nav-link {% if request.path == '/schedule' %}active{% endif %}" onclick="closeSidebar()">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+        Расписание
+      </a>
     </nav>
     <div class="px-4 py-4 border-t border-brand-700 text-xs text-brand-100 opacity-50">
       Профессиональный клининг<br>для бизнеса

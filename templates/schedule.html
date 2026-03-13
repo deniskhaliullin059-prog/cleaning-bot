@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Расписание — ООО ВИД CRM{% endblock %}
+{% block page_title %}Расписание на день{% endblock %}
+
+{% block content %}
+<!-- Дата и статистика -->
+<div class="flex flex-wrap items-center justify-between gap-4 mb-5">
+  <div class="text-slate-500 text-sm" id="today-label"></div>
+  <div class="flex gap-3">
+    <div class="bg-amber-50 text-amber-700 text-sm font-medium px-4 py-2 rounded-lg">
+      В работе: <span id="stat-inprogress" class="font-bold">—</span>
+    </div>
+    <div class="bg-indigo-50 text-indigo-700 text-sm font-medium px-4 py-2 rounded-lg">
+      Новых сегодня: <span id="stat-today" class="font-bold">—</span>
+    </div>
+    <div class="bg-emerald-50 text-emerald-700 text-sm font-medium px-4 py-2 rounded-lg">
+      Выполнено: <span id="stat-done" class="font-bold">—</span>
+    </div>
+  </div>
+</div>
+
+<!-- Список заявок -->
+<div id="schedule-list" class="space-y-3">
+  <div class="text-center py-12 text-slate-400">Загрузка...</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const STATUS_LABELS = { new: 'Новая', in_progress: 'В работе', done: 'Выполнена', cancelled: 'Отменена' };
+const STATUS_COLORS = {
+  new: 'bg-blue-100 text-blue-700',
+  in_progress: 'bg-amber-100 text-amber-700',
+  done: 'bg-emerald-100 text-emerald-700',
+  cancelled: 'bg-red-100 text-red-700',
+};
+
+document.getElementById('today-label').textContent =
+  new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    .replace(/^./, s => s.toUpperCase());
+
+async function loadSchedule() {
+  const res = await fetch('/api/schedule');
+  const d = await res.json();
+
+  document.getElementById('stat-inprogress').textContent = d.stats.in_progress;
+  document.getElementById('stat-today').textContent = d.stats.created_today;
+  document.getElementById('stat-done').textContent = d.stats.done_today;
+
+  const list = document.getElementById('schedule-list');
+  if (!d.orders.length) {
+    list.innerHTML = '<div class="text-center py-12 text-slate-400">Активных заявок нет</div>';
+    return;
+  }
+
+  list.innerHTML = d.orders.map(o => {
+    const time = o.created_at ? new Date(o.created_at).toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'}) : '';
+    const badge = `<span class="text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_COLORS[o.status]}">${STATUS_LABELS[o.status]}</span>`;
+    const executor = o.executor ? `<span class="text-xs bg-indigo-50 text-indigo-600 px-2 py-1 rounded-full">👤 ${o.executor}</span>` : '';
+    const price = o.price ? `<span class="text-xs bg-green-50 text-green-600 px-2 py-1 rounded-full">💰 ${o.price.toLocaleString('ru-RU')} ₽</span>` : '';
+
+    const nextBtn = o.status === 'new'
+      ? `<button onclick="advanceStatus(${o.id}, 'in_progress')" class="text-xs bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg transition">В работу</button>`
+      : o.status === 'in_progress'
+      ? `<button onclick="advanceStatus(${o.id}, 'done')" class="text-xs bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg transition">Выполнено</button>`
+      : '';
+
+    return `
+      <div class="bg-white rounded-xl shadow-sm p-4 flex flex-col sm:flex-row sm:items-center gap-3" id="row-${o.id}">
+        <div class="text-slate-400 text-sm font-mono w-12 shrink-0">${time}</div>
+        <div class="flex-1 min-w-0">
+          <div class="flex flex-wrap items-center gap-2 mb-1">
+            <span class="font-semibold text-slate-800">${o.name || '—'}</span>
+            ${badge}
+            ${executor}
+            ${price}
+          </div>
+          <div class="text-sm text-slate-600 truncate">${o.service || '—'}</div>
+          <div class="flex flex-wrap gap-3 mt-1 text-xs text-slate-400">
+            ${o.phone ? `<span>📞 ${o.phone}</span>` : ''}
+            ${o.address ? `<span>🏠 ${o.address}</span>` : ''}
+            ${o.date ? `<span>📅 ${o.date}</span>` : ''}
+          </div>
+        </div>
+        <div class="shrink-0">${nextBtn}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function advanceStatus(orderId, newStatus) {
+  const res = await fetch(`/api/orders/${orderId}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: newStatus }),
+  });
+  const d = await res.json();
+  if (d.ok) loadSchedule();
+}
+
+loadSchedule();
+setInterval(loadSchedule, 20000);
+</script>
+{% endblock %}
