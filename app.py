@@ -136,6 +136,8 @@ def login():
     error = None
     if request.method == "POST":
         crm_password = os.environ.get("CRM_PASSWORD", "admin")
+        import sys
+        print(f"DEBUG login: CRM_PASSWORD={'[SET len=' + str(len(crm_password)) + ']' if crm_password != 'admin' else '[DEFAULT=admin]'}", flush=True, file=sys.stderr)
         if request.form.get("password") == crm_password:
             session["logged_in"] = True
             return redirect(url_for("dashboard"))
