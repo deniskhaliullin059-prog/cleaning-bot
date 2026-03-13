@@ -1,4 +1,5 @@
 let allOrders = [];
+let allWorkers = [];
 let currentOrderId = null;
 let dragCard = null;
 
@@ -10,6 +11,11 @@ async function loadOrders() {
   const res = await fetch('/api/orders');
   allOrders = await res.json();
   renderBoard();
+}
+
+async function loadWorkers() {
+  const res = await fetch('/api/workers');
+  allWorkers = await res.json();
 }
 
 // ─── Рендер доски ────────────────────────────────────────────────────────────
@@ -46,6 +52,8 @@ function renderCard(o) {
   const date = o.date || '—';
   const created = o.created_at ? new Date(o.created_at).toLocaleDateString('ru-RU') : '';
   const service = (o.service || '').length > 35 ? (o.service || '').slice(0,35)+'…' : (o.service || '—');
+  const executorBadge = o.executor
+    ? `<div class="text-xs text-indigo-600 mt-1.5">👤 ${o.executor}</div>` : '';
   return `
     <div class="kanban-card" draggable="true" data-id="${o.id}">
       <div class="flex items-start justify-between">
@@ -58,6 +66,7 @@ function renderCard(o) {
         ${date !== '—' ? `<span>📅 ${date}</span>` : ''}
         ${created ? `<span class="text-slate-300">${created}</span>` : ''}
       </div>
+      ${executorBadge}
       ${stars ? `<div class="card-rating mt-2">${stars}</div>` : ''}
     </div>
   `;
@@ -133,6 +142,12 @@ function openModal(orderId) {
   document.getElementById('modal-rating').textContent = o.rating
     ? '★'.repeat(o.rating) + ` (${o.rating}/5)` : '—';
 
+  // Заполнить список исполнителей
+  const sel = document.getElementById('modal-executor-select');
+  sel.innerHTML = '<option value="">— Не назначен —</option>'
+    + allWorkers.map(w => `<option value="${w.id}" ${o.executor === w.name ? 'selected' : ''}>${w.name}</option>`).join('');
+  document.getElementById('modal-assign-result').textContent = '';
+
   updateModalButtons(o.status);
   document.getElementById('card-modal').classList.remove('hidden');
 }
@@ -163,7 +178,99 @@ document.querySelectorAll('.status-btn').forEach(btn => {
   });
 });
 
+// ─── Исполнитель ──────────────────────────────────────────────────────────────
+
+async function assignExecutor() {
+  if (!currentOrderId) return;
+  const sel = document.getElementById('modal-executor-select');
+  const workerId = sel.value ? parseInt(sel.value) : null;
+  const btn = document.getElementById('modal-assign-btn');
+  btn.disabled = true;
+
+  const res = await fetch(`/api/orders/${currentOrderId}/executor`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ worker_id: workerId }),
+  });
+  const d = await res.json();
+  const resultEl = document.getElementById('modal-assign-result');
+  if (d.ok) {
+    const order = allOrders.find(o => o.id === currentOrderId);
+    if (order) order.executor = d.executor;
+    renderBoard();
+    resultEl.innerHTML = d.executor
+      ? `<span class="text-green-600">Назначен: ${d.executor}</span>`
+      : '<span class="text-slate-500">Исполнитель снят</span>';
+  } else {
+    resultEl.innerHTML = `<span class="text-red-500">${d.error}</span>`;
+  }
+  btn.disabled = false;
+}
+
+// ─── Сотрудники ───────────────────────────────────────────────────────────────
+
+function openWorkersModal() {
+  renderWorkersList();
+  const m = document.getElementById('workers-modal');
+  m.classList.remove('hidden');
+  m.classList.add('flex');
+}
+
+function closeWorkersModal() {
+  const m = document.getElementById('workers-modal');
+  m.classList.add('hidden');
+  m.classList.remove('flex');
+}
+
+function renderWorkersList() {
+  const el = document.getElementById('workers-list');
+  if (!allWorkers.length) {
+    el.innerHTML = '<div class="text-sm text-slate-400 text-center py-2">Сотрудников пока нет</div>';
+    return;
+  }
+  el.innerHTML = allWorkers.map(w => `
+    <div class="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2">
+      <div>
+        <div class="text-sm font-medium text-slate-800">${w.name}</div>
+        ${w.telegram_id ? `<div class="text-xs text-slate-400">TG: ${w.telegram_id}</div>` : ''}
+      </div>
+      <button onclick="deleteWorker(${w.id})" class="text-slate-300 hover:text-red-500 transition ml-2">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+  `).join('');
+}
+
+async function addWorker() {
+  const name = document.getElementById('worker-name').value.trim();
+  const tgRaw = document.getElementById('worker-tg').value.trim();
+  if (!name) return;
+  const telegram_id = tgRaw ? parseInt(tgRaw) : null;
+
+  const res = await fetch('/api/workers', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, telegram_id }),
+  });
+  const d = await res.json();
+  if (d.ok) {
+    document.getElementById('worker-name').value = '';
+    document.getElementById('worker-tg').value = '';
+    await loadWorkers();
+    renderWorkersList();
+  }
+}
+
+async function deleteWorker(id) {
+  await fetch(`/api/workers/${id}`, { method: 'DELETE' });
+  await loadWorkers();
+  renderWorkersList();
+}
+
 // ─── Инициализация ────────────────────────────────────────────────────────────
 
+loadWorkers();
 loadOrders();
 setInterval(loadOrders, 15000);

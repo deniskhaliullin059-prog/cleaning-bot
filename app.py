@@ -53,9 +53,17 @@ def init_db():
             text TEXT, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS workers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            telegram_id INTEGER
+        )
+    """)
     for col in ["admin_message_id INTEGER", "rating INTEGER DEFAULT NULL",
                 "review_sent INTEGER DEFAULT 0", "status TEXT DEFAULT 'new'",
-                "price REAL DEFAULT NULL"]:
+                "price REAL DEFAULT NULL", "executor TEXT DEFAULT NULL",
+                "executor_id INTEGER DEFAULT NULL"]:
         try:
             c.execute(f"ALTER TABLE orders ADD COLUMN {col}")
         except Exception:
@@ -103,9 +111,17 @@ def init_db():
             text TEXT, timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS workers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            telegram_id INTEGER
+        )
+    """)
     for col in ["admin_message_id INTEGER", "rating INTEGER DEFAULT NULL",
                 "review_sent INTEGER DEFAULT 0", "status TEXT DEFAULT 'new'",
-                "price REAL DEFAULT NULL"]:
+                "price REAL DEFAULT NULL", "executor TEXT DEFAULT NULL",
+                "executor_id INTEGER DEFAULT NULL"]:
         try:
             c.execute(f"ALTER TABLE orders ADD COLUMN {col}")
         except Exception:
@@ -392,7 +408,7 @@ def api_orders():
     conn = get_db()
     c = conn.cursor()
     c.execute("""
-        SELECT id, user_id, name, phone, service, address, date, status, rating, created_at
+        SELECT id, user_id, name, phone, service, address, date, status, rating, created_at, executor
         FROM orders ORDER BY id DESC
     """)
     orders = []
@@ -408,6 +424,7 @@ def api_orders():
             "status": r["status"] or "new",
             "rating": r["rating"],
             "created_at": r["created_at"],
+            "executor": r["executor"],
         })
     conn.close()
     return jsonify(orders)
@@ -427,6 +444,89 @@ def api_update_status(order_id):
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
+
+
+# ─── API: Сотрудники ──────────────────────────────────────────────────────────
+
+@app.route("/api/workers")
+@login_required
+def api_workers():
+    conn = get_db()
+    rows = conn.execute("SELECT id, name, telegram_id FROM workers ORDER BY name").fetchall()
+    conn.close()
+    return jsonify([{"id": r["id"], "name": r["name"], "telegram_id": r["telegram_id"]} for r in rows])
+
+
+@app.route("/api/workers", methods=["POST"])
+@login_required
+def api_add_worker():
+    data = request.get_json()
+    name = data.get("name", "").strip()
+    telegram_id = data.get("telegram_id") or None
+    if not name:
+        return jsonify({"ok": False, "error": "Имя обязательно"}), 400
+    conn = get_db()
+    conn.execute("INSERT INTO workers (name, telegram_id) VALUES (?, ?)", (name, telegram_id))
+    conn.commit()
+    worker_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    conn.close()
+    return jsonify({"ok": True, "id": worker_id})
+
+
+@app.route("/api/workers/<int:worker_id>", methods=["DELETE"])
+@login_required
+def api_delete_worker(worker_id):
+    conn = get_db()
+    conn.execute("DELETE FROM workers WHERE id=?", (worker_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/orders/<int:order_id>/executor", methods=["PATCH"])
+@login_required
+def api_assign_executor(order_id):
+    data = request.get_json()
+    worker_id = data.get("worker_id")
+
+    executor_name = None
+    executor_tg_id = None
+    if worker_id:
+        conn = get_db()
+        w = conn.execute("SELECT name, telegram_id FROM workers WHERE id=?", (worker_id,)).fetchone()
+        conn.close()
+        if not w:
+            return jsonify({"ok": False, "error": "Сотрудник не найден"}), 404
+        executor_name = w["name"]
+        executor_tg_id = w["telegram_id"]
+
+    conn = get_db()
+    conn.execute("UPDATE orders SET executor=?, executor_id=? WHERE id=?",
+                 (executor_name, executor_tg_id, order_id))
+    conn.commit()
+    order = conn.execute(
+        "SELECT name, service, address, date FROM orders WHERE id=?", (order_id,)
+    ).fetchone()
+    conn.close()
+
+    if executor_tg_id and order:
+        text = (
+            f"📋 Вам назначена заявка #{order_id}\n\n"
+            f"👤 Клиент: {order['name']}\n"
+            f"🛠 Услуга: {order['service']}\n"
+            f"🏠 Адрес: {order['address']}\n"
+            f"📅 Дата: {order['date']}\n\n"
+            "Удачи в работе! — ООО ВИД 🏢"
+        )
+        try:
+            requests.post(
+                f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                json={"chat_id": executor_tg_id, "text": text}
+            )
+        except Exception:
+            pass
+
+    return jsonify({"ok": True, "executor": executor_name})
 
 
 # ─── API: Экспорт Excel ───────────────────────────────────────────────────────
