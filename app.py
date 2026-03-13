@@ -4,8 +4,9 @@ import requests
 import os
 import subprocess
 import sys
+import io
 from datetime import datetime, timedelta
-from flask import Flask, render_template, jsonify, request, Response, stream_with_context, session, redirect, url_for
+from flask import Flask, render_template, jsonify, request, Response, stream_with_context, session, redirect, url_for, send_file
 import queue
 import threading
 import functools
@@ -418,6 +419,65 @@ def api_update_status(order_id):
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
+
+
+# ─── API: Экспорт Excel ───────────────────────────────────────────────────────
+
+@app.route("/api/export")
+@login_required
+def api_export():
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""
+        SELECT id, name, phone, service, address, date, status, price, rating, created_at
+        FROM orders ORDER BY id DESC
+    """)
+    rows = c.fetchall()
+    conn.close()
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Заявки ООО ВИД"
+
+    headers = ["№", "Клиент", "Телефон", "Услуга", "Адрес", "Дата", "Статус", "Выручка (₽)", "Оценка", "Создана"]
+    header_fill = PatternFill("solid", fgColor="4F46E5")
+    header_font = Font(bold=True, color="FFFFFF")
+
+    for col, h in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col, value=h)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center")
+
+    STATUS_RU = {"new": "Новая", "in_progress": "В работе", "done": "Выполнена", "cancelled": "Отменена"}
+    for row in rows:
+        ws.append([
+            row["id"],
+            row["name"] or "",
+            row["phone"] or "",
+            row["service"] or "",
+            row["address"] or "",
+            row["date"] or "",
+            STATUS_RU.get(row["status"] or "new", row["status"] or ""),
+            row["price"] or "",
+            row["rating"] or "",
+            row["created_at"] or "",
+        ])
+
+    col_widths = [6, 22, 16, 30, 30, 18, 12, 14, 8, 20]
+    for i, w in enumerate(col_widths, 1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    filename = f"vid_orders_{datetime.now().strftime('%Y%m%d')}.xlsx"
+    return send_file(buf, as_attachment=True, download_name=filename,
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
 # ─── API: Рассылка ────────────────────────────────────────────────────────────
