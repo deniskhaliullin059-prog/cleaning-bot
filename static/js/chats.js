@@ -22,13 +22,14 @@ function renderClients(clients) {
     const preview = (c.last_msg || '').slice(0, 38) + ((c.last_msg || '').length > 38 ? '…' : '');
     const isActive = c.user_id === currentUserId;
     const nightBadge = c.night_lead ? '<span class="text-xs ml-1" title="Ночной лид">🌙</span>' : '';
+    const refBadge = c.referrals > 0 ? `<span class="text-xs ml-1 text-emerald-600 font-medium" title="${c.referrals} реф.">👥${c.referrals}</span>` : '';
     return `
       <div class="client-item ${isActive ? 'active' : ''}" data-uid="${c.user_id}" onclick="selectClient(${c.user_id})">
         <div class="flex items-center gap-3">
           <div class="w-9 h-9 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm font-bold shrink-0">${initials}</div>
           <div class="flex-1 min-w-0">
             <div class="flex items-center justify-between">
-              <span class="font-medium text-sm text-slate-800 truncate">${c.user_name || `ID ${c.user_id}`}${nightBadge}</span>
+              <span class="font-medium text-sm text-slate-800 truncate">${c.user_name || `ID ${c.user_id}`}${nightBadge}${refBadge}</span>
               <span class="text-xs text-slate-400 ml-2 shrink-0">${time}</span>
             </div>
             <div class="text-xs text-slate-500 truncate mt-0.5">${preview}</div>

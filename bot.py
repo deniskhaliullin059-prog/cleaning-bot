@@ -20,6 +20,7 @@ SYSTEM_PROMPT = (
     "Мы обслуживаем коммерческие помещения: офисы, торговые площади, производственные комплексы, склады, медицинские учреждения и бизнес-центры. "
     "ПРАВИЛО №1 — АБСОЛЮТНОЕ: каждое слово в твоём ответе должно быть написано только русскими буквами. Перед отправкой ответа проверь — нет ли в нём латиницы, иероглифов или других нерусских символов. Если есть — замени на русский эквивалент. "
     "ПРАВИЛО №2 — ГРАММАТИКА: каждое предложение должно быть полным — с подлежащим, сказуемым и правильными падежными окончаниями. Перед отправкой проверь каждое предложение: есть ли в нём глагол? Правильны ли падежи? Не обрывается ли мысль на полуслове? Если предложение неполное — перепиши его. "
+    "ПРАВИЛО №3 — АБСОЛЮТНОЕ: у ООО ВИД нет сайта, нет личного кабинета, нет электронной почты и нет телефона для клиентов. Всё общение — только через этот Telegram-бот. Никогда не упоминай сайт, личный кабинет, электронную почту или звонки. Если нарушишь это правило — ответ будет неверным. "
     "Пиши просто и коротко. Используй короткие предложения без сложных оборотов. "
     "Не угадывай — всегда уточняй у клиента. "
 
@@ -67,7 +68,12 @@ SYSTEM_PROMPT = (
     "В конце сообщения на отдельной строке добавь: ЗАЯВКА_ПРИНЯТА: имя=[имя], телефон=[телефон], услуга=[услуга], адрес=[адрес], дата=[дата], цена=[итоговая стоимость числом в рублях без знака рубля] "
     "КРИТИЧЕСКИ ВАЖНО: добавляй метку ЗАЯВКА_ПРИНЯТА ТОЛЬКО если у тебя есть ВСЕ данные: реальное имя, реальный номер телефона (цифры), адрес, услуга и дата. "
     "Если хотя бы одно поле не заполнено — НЕ добавляй метку ЗАЯВКА_ПРИНЯТА, а задай уточняющий вопрос. "
-    "ВАЖНО: не пропускай шаги 5 и 6! Задавай строго по одному вопросу за раз."
+    "ВАЖНО: не пропускай шаги 5 и 6! Задавай строго по одному вопросу за раз. "
+
+    "РЕФЕРАЛЬНАЯ ПРОГРАММА: "
+    "Реферальную ссылку клиент получает командой /myref прямо в этом боте — больше никак. "
+    "За каждого нового клиента по ссылке реферер получает скидку 5% на следующую уборку. "
+    "Если клиент спрашивает про реферальную ссылку — ответь ТОЛЬКО: напишите команду /myref в этом боте и получите свою ссылку."
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -87,6 +93,8 @@ def clean_text(text):
     result = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
     result = re.sub(r'[\u4e00-\u9fff\u3000-\u303f\u3040-\u30ff\uff00-\uffef'
                     r'\u0600-\u06ff\u0900-\u097f\u0e00-\u0e7f]', '', result)
+    # Убираем слова из латинских букв (3+ символов) — LLM иногда вставляет иностранные слова
+    result = re.sub(r'\b[a-zA-Z]{3,}\b', '', result)
     result = re.sub(r' +', ' ', result)
     return result.strip()
 
@@ -119,6 +127,16 @@ def init_db():
             direction TEXT,
             text TEXT,
             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS referrals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            referrer_id INTEGER NOT NULL,
+            referred_id INTEGER NOT NULL,
+            notified INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(referred_id)
         )
     """)
     # миграция существующих таблиц
@@ -460,6 +478,27 @@ async def post_init(app):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     conversations[user_id] = []
+
+    # Обработка реферальной ссылки
+    args = context.args
+    if args and args[0].startswith('ref_'):
+        try:
+            referrer_id = int(args[0][4:])
+            if referrer_id != user_id:
+                conn = sqlite3.connect(DB_PATH)
+                c = conn.cursor()
+                c.execute(
+                    "INSERT OR IGNORE INTO referrals (referrer_id, referred_id) VALUES (?, ?)",
+                    (referrer_id, user_id)
+                )
+                conn.commit()
+                conn.close()
+        except (ValueError, Exception):
+            pass
+
+    bot_me = await context.bot.get_me()
+    ref_link = f"https://t.me/{bot_me.username}?start=ref_{user_id}"
+
     await update.message.reply_text(
         "Добро пожаловать в ООО ВИД!\n"
         "Профессиональный клининг для бизнеса и предприятий 🏢\n\n"
@@ -472,8 +511,27 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• Дезинфекция помещений — от 15 руб/кв.м\n"
         "• Уборка производств и складов — от 20 руб/кв.м\n"
         "• Химчистка мягкой мебели — от 400 руб\n\n"
-        "Какая услуга вас интересует?"
+        "Какая услуга вас интересует?\n\n"
+        f"🎁 Ваша реферальная ссылка:\n{ref_link}\n"
+        "Поделитесь с партнёрами — получите скидку 5% за каждого нового клиента."
     )
+
+async def myref(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    bot_me = await context.bot.get_me()
+    ref_link = f"https://t.me/{bot_me.username}?start=ref_{user_id}"
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM referrals WHERE referrer_id = ?", (user_id,))
+    count = c.fetchone()[0]
+    conn.close()
+    await update.message.reply_text(
+        f"🔗 Ваша реферальная ссылка:\n{ref_link}\n\n"
+        f"Приглашено клиентов: {count}\n"
+        "За каждого нового клиента по вашей ссылке — скидка 5% на следующий заказ.\n"
+        "Сообщите об этом менеджеру при оформлении заявки."
+    )
+
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.id == ADMIN_GROUP_ID:
@@ -498,6 +556,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # сохранить входящее сообщение
     save_message(user_id, user_name, "in", user_text)
+
+    # Перехват вопросов про реферальную программу — LLM даёт неверный ответ про сайт
+    if any(kw in user_text.lower() for kw in ("реферальн", "реферал", "пригласить", "привести клиента", "скидку за", "ссылку для", "своих клиентов", "партнёрск", "партнерск")):
+        bot_me = await context.bot.get_me()
+        ref_link_hint = f"https://t.me/{bot_me.username}?start=ref_{user_id}"
+        ref_reply = (
+            "Реферальная программа работает прямо здесь, в боте.\n\n"
+            "Напишите команду /myref — и получите вашу персональную ссылку.\n\n"
+            f"Или вот она прямо сейчас:\n{ref_link_hint}\n\n"
+            "За каждого нового клиента, пришедшего по вашей ссылке, вы получаете скидку 5% на следующую уборку."
+        )
+        conversations[user_id].append({"role": "user", "content": user_text})
+        conversations[user_id].append({"role": "assistant", "content": ref_reply})
+        save_message(user_id, "ООО ВИД", "out", ref_reply)
+        await update.message.reply_text(ref_reply)
+        return
 
     loyal = is_loyal_client(user_id)
     loyal_system = "ПОСТОЯННЫЙ_КЛИЕНТ=ДА — применяй скидку 10% и сообщи об этом клиенту." if loyal else "ПОСТОЯННЫЙ_КЛИЕНТ=НЕТ"
@@ -575,8 +649,66 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 admin_msg_id,
                 price_val,
             )
+            # Уведомить реферера при первом заказе реферала
+            ref_conn = sqlite3.connect(DB_PATH)
+            ref_c = ref_conn.cursor()
+            ref_c.execute(
+                "SELECT referrer_id FROM referrals WHERE referred_id = ? AND notified = 0",
+                (user_id,)
+            )
+            ref_row = ref_c.fetchone()
+            if ref_row:
+                referrer_id = ref_row[0]
+                ref_c.execute("UPDATE referrals SET notified = 1 WHERE referred_id = ?", (user_id,))
+                ref_conn.commit()
+                ref_conn.close()
+                referred_name = data.get("имя", "Новый клиент")
+                try:
+                    await context.bot.send_message(
+                        chat_id=referrer_id,
+                        text=(
+                            f"По вашей реферальной ссылке оформил заявку клиент {referred_name}!\n\n"
+                            "Вы получаете скидку 5% на следующую уборку.\n"
+                            "Сообщите об этом менеджеру при следующем заказе."
+                        )
+                    )
+                except Exception as ref_err:
+                    logger.error(f"Ошибка уведомления реферера: {ref_err}")
+            else:
+                ref_conn.close()
         clean_reply = reply.split("ЗАЯВКА_ПРИНЯТА:")[0].strip()
         clean_reply = clean_text(clean_reply)
+        # Фильтр галлюцинаций: если LLM упомянул несуществующий сайт/кабинет — вырезаем предложения
+        hallucination_markers = (
+            "наш сайт", "нашем сайте", "на сайте", "на нашем сайт",
+            "личный кабинет", "личном кабинете", "в личном кабинет",
+            "зарегистрируйтесь", "авторизуйтесь", "войдите на сайт",
+            "электронную почту", "электронной почте", "по электронной",
+            "позвоните нам", "наш номер телефона", "по телефону",
+        )
+        if any(m in clean_reply.lower() for m in hallucination_markers):
+            sentences = re.split(r'(?<=[.!?])\s+', clean_reply)
+            clean_sentences = [s for s in sentences if not any(m in s.lower() for m in hallucination_markers)]
+            clean_reply = " ".join(clean_sentences).strip()
+            if not clean_reply:
+                clean_reply = "Для оформления заявки или получения информации — напишите мне здесь, в боте."
+        # Перехват на ответ: если LLM отказался отвечать про реферальную программу или запутался
+        referral_denial = (
+            "нет информации о реферальн", "не знаю о реферальн",
+            "не могу предоставить информацию о реферальн",
+            "не является одной из наших услуг",
+            "моя основная функция", "моя основная задача",
+            "не входит в мои функции", "не могу помочь с реферальн",
+        )
+        if any(m in clean_reply.lower() for m in referral_denial):
+            bot_me = await context.bot.get_me()
+            ref_link_hint = f"https://t.me/{bot_me.username}?start=ref_{user_id}"
+            clean_reply = (
+                "Реферальная программа работает прямо здесь, в боте.\n\n"
+                "Напишите команду /myref — и получите вашу персональную ссылку.\n\n"
+                f"Или вот она прямо сейчас:\n{ref_link_hint}\n\n"
+                "За каждого нового клиента по вашей ссылке — скидка 5% на следующую уборку."
+            )
         # Ночное уведомление — только первый раз за сессию
         if is_night_hours() and user_id not in night_notified:
             clean_reply += "\n\n🌙 Ваш запрос принят. Менеджер ответит с 9:00."
@@ -614,6 +746,7 @@ def main():
     app = Application.builder().token(TELEGRAM_TOKEN).post_init(post_init).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("reset", reset))
+    app.add_handler(CommandHandler("myref", myref))
     app.add_handler(CommandHandler("accept", cmd_accept))
     app.add_handler(CommandHandler("done", cmd_done))
     app.add_handler(CommandHandler("report", cmd_report))

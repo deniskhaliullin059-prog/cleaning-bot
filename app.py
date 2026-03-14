@@ -60,6 +60,16 @@ def init_db():
             telegram_id INTEGER
         )
     """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS referrals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            referrer_id INTEGER NOT NULL,
+            referred_id INTEGER NOT NULL,
+            notified INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(referred_id)
+        )
+    """)
     for col in ["admin_message_id INTEGER", "rating INTEGER DEFAULT NULL",
                 "review_sent INTEGER DEFAULT 0", "status TEXT DEFAULT 'new'",
                 "price REAL DEFAULT NULL", "executor TEXT DEFAULT NULL",
@@ -116,6 +126,16 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             telegram_id INTEGER
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS referrals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            referrer_id INTEGER NOT NULL,
+            referred_id INTEGER NOT NULL,
+            notified INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now')),
+            UNIQUE(referred_id)
         )
     """)
     for col in ["admin_message_id INTEGER", "rating INTEGER DEFAULT NULL",
@@ -330,8 +350,11 @@ def api_clients():
         GROUP BY m.user_id
         ORDER BY last_time DESC
     """)
+    rows = c.fetchall()
+    c.execute("SELECT referrer_id, COUNT(*) as cnt FROM referrals GROUP BY referrer_id")
+    ref_counts = {r["referrer_id"]: r["cnt"] for r in c.fetchall()}
     clients = []
-    for r in c.fetchall():
+    for r in rows:
         h = r["last_in_hour"]
         night_lead = h is not None and (h >= 20 or h < 9)
         clients.append({
@@ -341,6 +364,7 @@ def api_clients():
             "last_msg": r["last_msg"],
             "in_count": r["in_count"],
             "night_lead": night_lead,
+            "referrals": ref_counts.get(r["user_id"], 0),
         })
     conn.close()
     return jsonify(clients)
