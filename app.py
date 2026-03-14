@@ -792,6 +792,57 @@ def api_broadcast():
     return jsonify({"ok": True, "sent": sent, "failed": failed, "total": len(user_ids)})
 
 
+# ─── API: Статус бота ────────────────────────────────────────────────────────
+
+@app.route("/api/bot/status")
+@login_required
+def api_bot_status():
+    try:
+        resp = requests.get(
+            f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/getMe",
+            timeout=5
+        )
+        if resp.ok and resp.json().get("ok"):
+            return jsonify({"ok": True})
+    except Exception:
+        pass
+    return jsonify({"ok": False})
+
+
+# ─── API: Карточка клиента ────────────────────────────────────────────────────
+
+@app.route("/api/client/<int:user_id>")
+@login_required
+def api_client(user_id):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("""
+        SELECT name, phone, COUNT(*) as orders_count,
+               COALESCE(SUM(price), 0) as ltv,
+               COALESCE(AVG(price), 0) as avg_check
+        FROM orders WHERE user_id=?
+    """, (user_id,))
+    row = c.fetchone()
+    c.execute("""
+        SELECT id, service, address, date, status, price, rating, created_at
+        FROM orders WHERE user_id=? ORDER BY id DESC LIMIT 20
+    """, (user_id,))
+    orders = [dict(r) for r in c.fetchall()]
+    c.execute("SELECT COUNT(*) FROM referrals WHERE referrer_id=?", (user_id,))
+    referrals = c.fetchone()[0]
+    conn.close()
+    return jsonify({
+        "user_id": user_id,
+        "name": row["name"] if row else None,
+        "phone": row["phone"] if row else None,
+        "orders_count": row["orders_count"] if row else 0,
+        "ltv": int(row["ltv"]) if row else 0,
+        "avg_check": int(row["avg_check"]) if row else 0,
+        "referrals": referrals,
+        "orders": orders,
+    })
+
+
 # ─── SSE: Уведомления ─────────────────────────────────────────────────────────
 
 @app.route("/api/events")

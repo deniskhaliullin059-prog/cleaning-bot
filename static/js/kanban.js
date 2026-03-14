@@ -10,6 +10,40 @@ const COLUMNS = ['new', 'in_progress', 'done', 'cancelled'];
 async function loadOrders() {
   const res = await fetch('/api/orders');
   allOrders = await res.json();
+  populateFilterSelects();
+  renderBoard();
+}
+
+function populateFilterSelects() {
+  const services = [...new Set(allOrders.map(o => o.service).filter(Boolean))].sort();
+  const svcSel = document.getElementById('filter-service');
+  const currentSvc = svcSel.value;
+  svcSel.innerHTML = '<option value="">Все услуги</option>'
+    + services.map(s => `<option value="${s}" ${s === currentSvc ? 'selected' : ''}>${s}</option>`).join('');
+
+  const execSel = document.getElementById('filter-executor');
+  const currentExec = execSel.value;
+  const executors = [...new Set(allOrders.map(o => o.executor).filter(Boolean))].sort();
+  execSel.innerHTML = '<option value="">Все исполнители</option>'
+    + executors.map(e => `<option value="${e}" ${e === currentExec ? 'selected' : ''}>${e}</option>`).join('');
+}
+
+function getFilteredOrders() {
+  const q = document.getElementById('filter-search').value.toLowerCase().trim();
+  const svc = document.getElementById('filter-service').value;
+  const exec = document.getElementById('filter-executor').value;
+  return allOrders.filter(o => {
+    if (q && !((o.name || '').toLowerCase().includes(q) || (o.phone || '').includes(q) || (o.address || '').toLowerCase().includes(q))) return false;
+    if (svc && o.service !== svc) return false;
+    if (exec && o.executor !== exec) return false;
+    return true;
+  });
+}
+
+function clearFilters() {
+  document.getElementById('filter-search').value = '';
+  document.getElementById('filter-service').value = '';
+  document.getElementById('filter-executor').value = '';
   renderBoard();
 }
 
@@ -21,11 +55,12 @@ async function loadWorkers() {
 // ─── Рендер доски ────────────────────────────────────────────────────────────
 
 function renderBoard() {
+  const filtered = getFilteredOrders();
   COLUMNS.forEach(status => {
     const container = document.getElementById(`cards-${status}`);
     const col = document.getElementById(`col-${status}`);
     const badge = col.querySelector('.count-badge');
-    const orders = allOrders.filter(o => o.status === status);
+    const orders = filtered.filter(o => o.status === status);
     badge.textContent = orders.length;
 
     if (!orders.length) {
@@ -268,6 +303,12 @@ async function deleteWorker(id) {
   await loadWorkers();
   renderWorkersList();
 }
+
+// ─── Фильтры ──────────────────────────────────────────────────────────────────
+
+document.getElementById('filter-search').addEventListener('input', renderBoard);
+document.getElementById('filter-service').addEventListener('change', renderBoard);
+document.getElementById('filter-executor').addEventListener('change', renderBoard);
 
 // ─── Инициализация ────────────────────────────────────────────────────────────
 

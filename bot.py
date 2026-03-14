@@ -13,6 +13,7 @@ load_dotenv()
 TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
 GROQ_API_KEY = os.environ["GROQ_API_KEY"]
 ADMIN_GROUP_ID = int(os.environ.get("ADMIN_GROUP_ID", "-5109857763"))
+MANAGER_ID = int(os.environ.get("MANAGER_ID", "0"))
 DB_PATH = os.environ.get("DB_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "orders.db"))
 
 SYSTEM_PROMPT = (
@@ -254,6 +255,17 @@ async def notify_admin(app, data, loyal=False):
     )
     try:
         msg = await app.bot.send_message(chat_id=ADMIN_GROUP_ID, text=text)
+        if MANAGER_ID:
+            short = (
+                f"🆕 Новая заявка!\n"
+                f"👤 {data.get('имя', '—')} · {data.get('телефон', '—')}\n"
+                f"🛠 {data.get('услуга', '—')}\n"
+                f"📅 {data.get('дата', '—')}"
+            )
+            try:
+                await app.bot.send_message(chat_id=MANAGER_ID, text=short)
+            except Exception as me:
+                logger.error(f"Ошибка личного уведомления менеджера: {me}")
         return msg.message_id
     except Exception as e:
         logger.error(f"Ошибка отправки в группу: {e}")

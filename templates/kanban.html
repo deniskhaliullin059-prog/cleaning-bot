@@ -26,7 +26,27 @@
     Скачать Excel
   </a>
 </div>
-<div class="flex gap-4 overflow-x-auto pb-4" id="kanban-board" style="min-height: calc(100dvh - 180px);">
+<!-- Фильтры -->
+<div class="flex flex-wrap gap-2 mb-3">
+  <input id="filter-search" type="text" placeholder="Поиск по имени, телефону..."
+    class="flex-1 min-w-[180px] bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400 placeholder:text-slate-400">
+  <select id="filter-service"
+    class="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400 text-slate-700">
+    <option value="">Все услуги</option>
+  </select>
+  <select id="filter-executor"
+    class="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-400 text-slate-700">
+    <option value="">Все исполнители</option>
+  </select>
+  <button onclick="clearFilters()"
+    class="bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm px-3 py-2 rounded-lg transition" title="Сбросить фильтры">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+    </svg>
+  </button>
+</div>
+
+<div class="flex gap-4 overflow-x-auto pb-4" id="kanban-board" style="min-height: calc(100dvh - 230px);">
 
   <!-- Колонка: Новые -->
   <div class="kanban-col" id="col-new" data-status="new">

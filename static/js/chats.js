@@ -59,9 +59,10 @@ async function selectClient(userId) {
   av.textContent = name.slice(0,2).toUpperCase();
   av.classList.remove('hidden');
 
-  // включить поле ввода
+  // включить поле ввода и кнопку карточки
   document.getElementById('msg-input').disabled = false;
   document.getElementById('send-btn').disabled = false;
+  document.getElementById('client-card-btn').classList.remove('hidden');
 
   await loadMessages(userId);
 
@@ -179,6 +180,83 @@ evtSource.onmessage = async (e) => {
     }
   }
 };
+
+// ─── Карточка клиента ─────────────────────────────────────────────────────────
+
+const STATUS_LABELS_CARD = { new: 'Новая', in_progress: 'В работе', done: 'Выполнена', cancelled: 'Отменена' };
+const STATUS_COLORS = { new: 'bg-blue-100 text-blue-700', in_progress: 'bg-amber-100 text-amber-700', done: 'bg-emerald-100 text-emerald-700', cancelled: 'bg-red-100 text-red-600' };
+
+function fmtRub(v) {
+  if (!v) return '0 ₽';
+  if (v >= 1000000) return (v / 1000000).toFixed(1) + ' млн ₽';
+  if (v >= 1000) return (v / 1000).toFixed(0) + ' тыс ₽';
+  return v + ' ₽';
+}
+
+async function openClientCard() {
+  if (!currentUserId) return;
+  const modal = document.getElementById('client-card-modal');
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+  document.getElementById('client-card-body').innerHTML = '<div class="text-center text-slate-400 text-sm py-6">Загрузка...</div>';
+
+  const res = await fetch(`/api/client/${currentUserId}`);
+  const d = await res.json();
+
+  const initials = (d.name || '?').slice(0, 2).toUpperCase();
+  const ordersHtml = d.orders.length ? d.orders.map(o => `
+    <div class="flex items-start gap-3 py-2 border-b border-slate-50 last:border-0">
+      <div class="flex-1 min-w-0">
+        <div class="text-sm font-medium text-slate-700 truncate">${o.service || '—'}</div>
+        <div class="text-xs text-slate-400 mt-0.5">${o.date || o.created_at?.slice(0, 10) || '—'} · ${o.address || '—'}</div>
+      </div>
+      <div class="shrink-0 flex flex-col items-end gap-1">
+        <span class="text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[o.status] || ''}">${STATUS_LABELS_CARD[o.status] || o.status}</span>
+        ${o.price ? `<span class="text-xs text-emerald-600 font-medium">${fmtRub(o.price)}</span>` : ''}
+        ${o.rating ? `<span class="text-xs text-amber-500">${'★'.repeat(o.rating)}</span>` : ''}
+      </div>
+    </div>
+  `).join('') : '<div class="text-sm text-slate-400 py-2">Заявок нет</div>';
+
+  document.getElementById('client-card-body').innerHTML = `
+    <div class="flex items-center gap-3">
+      <div class="w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-lg font-bold shrink-0">${initials}</div>
+      <div>
+        <div class="font-semibold text-slate-800">${d.name || '—'}</div>
+        <div class="text-xs text-slate-400">TG: ${d.user_id}${d.phone ? ' · ' + d.phone : ''}</div>
+      </div>
+    </div>
+    <div class="grid grid-cols-3 gap-3">
+      <div class="bg-slate-50 rounded-xl p-3 text-center">
+        <div class="text-lg font-bold text-indigo-600">${d.orders_count}</div>
+        <div class="text-xs text-slate-500 mt-0.5">Заявок</div>
+      </div>
+      <div class="bg-slate-50 rounded-xl p-3 text-center">
+        <div class="text-lg font-bold text-emerald-600">${fmtRub(d.ltv)}</div>
+        <div class="text-xs text-slate-500 mt-0.5">LTV</div>
+      </div>
+      <div class="bg-slate-50 rounded-xl p-3 text-center">
+        <div class="text-lg font-bold text-slate-700">${fmtRub(d.avg_check)}</div>
+        <div class="text-xs text-slate-500 mt-0.5">Ср. чек</div>
+      </div>
+    </div>
+    ${d.referrals ? `<div class="text-sm text-emerald-600">👥 Привёл клиентов по реферальной ссылке: ${d.referrals}</div>` : ''}
+    <div>
+      <div class="text-xs font-medium text-slate-500 mb-2">История заявок</div>
+      ${ordersHtml}
+    </div>
+  `;
+}
+
+function closeClientCard() {
+  const modal = document.getElementById('client-card-modal');
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+}
+
+document.getElementById('client-card-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('client-card-modal')) closeClientCard();
+});
 
 // ─── Рассылка ─────────────────────────────────────────────────────────────────
 
