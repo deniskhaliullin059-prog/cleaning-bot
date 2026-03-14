@@ -82,7 +82,8 @@ logger = logging.getLogger(__name__)
 
 client = Groq(api_key=GROQ_API_KEY)
 conversations = {}
-night_notified = set()  # user_ids, получившие ночное уведомление в текущей сессии
+night_notified = set()
+price_waiting = set()  # user_ids, ожидающие ввода площади для сметы
 
 
 def is_night_hours():
@@ -569,6 +570,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # сохранить входящее сообщение
     save_message(user_id, user_name, "in", user_text)
 
+    # Смета: пользователь ввёл площадь
+    if user_id in price_waiting:
+        price_waiting.discard(user_id)
+        m = re.search(r'\d[\d\s]*', user_text.replace(',', '.'))
+        if m:
+            try:
+                area = float(m.group().replace(' ', ''))
+                reply = calc_price(area)
+                save_message(user_id, "ООО ВИД", "out", reply)
+                await update.message.reply_text(reply)
+                return
+            except ValueError:
+                pass
+        await update.message.reply_text("Не удалось распознать площадь. Введите число, например: 150")
+        price_waiting.add(user_id)
+        return
+
     loyal = is_loyal_client(user_id)
     loyal_system = "ПОСТОЯННЫЙ_КЛИЕНТ=ДА — применяй скидку 10% и сообщи об этом клиенту." if loyal else "ПОСТОЯННЫЙ_КЛИЕНТ=НЕТ"
 
@@ -755,6 +773,33 @@ async def handle_referral_question(update: Update, context: ContextTypes.DEFAULT
     await update.message.reply_text(reply)
 
 
+def calc_price(area: float) -> str:
+    lines = [f"📐 Площадь: {int(area)} кв.м\n"]
+    services = [
+        ("Регулярная уборка офисов",        area * 25,  3000),
+        ("Комплексная уборка помещений",     area * 45,  5000),
+        ("Мытьё окон и фасадов",            area * 80,  3000),
+        ("Дезинфекция помещений",           area * 15,  5000),
+        ("Уборка производств и складов",    area * 20,  3000),
+    ]
+    for name, raw, minimum in services:
+        total = max(raw, minimum)
+        note = f" (мин. {minimum:,.0f} ₽)".replace(",", " ") if raw < minimum else ""
+        lines.append(f"• {name}: {total:,.0f} ₽{note}".replace(",", " "))
+    lines.append("\n• Генеральная уборка: от 7 000 ₽")
+    lines.append("• Уборка после ремонта: от 7 000 ₽")
+    lines.append("• Химчистка мебели: диван от 2 500 ₽, кресло от 900 ₽")
+    lines.append("\nВыезд включён при заказе от 10 000 ₽.")
+    lines.append("Чтобы оформить заявку — просто напишите нам!")
+    return "\n".join(lines)
+
+
+async def price_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    price_waiting.add(user_id)
+    await update.message.reply_text("Укажите площадь помещения в кв.м — рассчитаю стоимость по всем услугам.")
+
+
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     conversations[user_id] = []
@@ -766,6 +811,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("reset", reset))
     app.add_handler(CommandHandler("myref", myref))
+    app.add_handler(CommandHandler("price", price_command))
     app.add_handler(CommandHandler("accept", cmd_accept))
     app.add_handler(CommandHandler("done", cmd_done))
     app.add_handler(CommandHandler("report", cmd_report))
