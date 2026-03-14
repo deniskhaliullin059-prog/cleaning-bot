@@ -130,9 +130,11 @@
 
 <!-- Последние заявки -->
 <div class="bg-white rounded-xl shadow-sm">
-  <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-    <div class="font-semibold text-sm text-slate-700">Все заявки</div>
-    <div class="text-xs text-slate-400" id="recent-info"></div>
+  <div class="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center gap-3">
+    <div class="font-semibold text-sm text-slate-700 shrink-0">Все заявки</div>
+    <input id="recent-search" type="text" placeholder="Поиск по имени, услуге, телефону..."
+      class="flex-1 min-w-[200px] bg-slate-100 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-indigo-400 placeholder:text-slate-400">
+    <div class="text-xs text-slate-400 shrink-0" id="recent-info"></div>
   </div>
   <div class="overflow-x-auto">
     <table class="data-table">

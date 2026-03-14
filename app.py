@@ -799,23 +799,31 @@ def api_broadcast():
 def api_recent():
     per_page = 10
     page = max(1, int(request.args.get("page", 1)))
+    search = request.args.get("search", "").strip()
     offset = (page - 1) * per_page
     conn = get_db()
     c = conn.cursor()
-    c.execute("SELECT COUNT(*) FROM orders")
-    total = c.fetchone()[0]
-    c.execute("""
-        SELECT id, name, phone, service, address, date, status, rating
-        FROM orders ORDER BY id DESC LIMIT ? OFFSET ?
-    """, (per_page, offset))
-    orders = []
-    for r in c.fetchall():
-        orders.append({
-            "id": r["id"], "name": r["name"], "phone": r["phone"],
-            "service": r["service"], "address": r["address"],
-            "date": r["date"], "status": r["status"] or "new",
-            "rating": r["rating"],
-        })
+    if search:
+        like = f"%{search}%"
+        c.execute("SELECT COUNT(*) FROM orders WHERE name LIKE ? OR phone LIKE ? OR service LIKE ? OR address LIKE ?",
+                  (like, like, like, like))
+        total = c.fetchone()[0]
+        c.execute("""
+            SELECT id, name, phone, service, address, date, status, rating
+            FROM orders WHERE name LIKE ? OR phone LIKE ? OR service LIKE ? OR address LIKE ?
+            ORDER BY id DESC LIMIT ? OFFSET ?
+        """, (like, like, like, like, per_page, offset))
+    else:
+        c.execute("SELECT COUNT(*) FROM orders")
+        total = c.fetchone()[0]
+        c.execute("""
+            SELECT id, name, phone, service, address, date, status, rating
+            FROM orders ORDER BY id DESC LIMIT ? OFFSET ?
+        """, (per_page, offset))
+    orders = [{"id": r["id"], "name": r["name"], "phone": r["phone"],
+               "service": r["service"], "address": r["address"],
+               "date": r["date"], "status": r["status"] or "new", "rating": r["rating"]}
+              for r in c.fetchall()]
     conn.close()
     return jsonify({"orders": orders, "total": total, "page": page, "per_page": per_page})
 

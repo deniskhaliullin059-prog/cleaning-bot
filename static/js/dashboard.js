@@ -160,7 +160,8 @@ let currentPage = 1;
 
 async function loadRecent(page) {
   currentPage = page;
-  const res = await fetch(`/api/recent?page=${page}`);
+  const q = document.getElementById('recent-search').value.trim();
+  const res = await fetch(`/api/recent?page=${page}${q ? '&search=' + encodeURIComponent(q) : ''}`);
   const d = await res.json();
   const tbody = document.getElementById('recent-tbody');
   const totalPages = Math.ceil(d.total / d.per_page);
@@ -204,6 +205,8 @@ async function loadRecent(page) {
 function changePage(delta) {
   loadRecent(currentPage + delta);
 }
+
+document.getElementById('recent-search').addEventListener('input', () => loadRecent(1));
 
 loadStats();
 loadRecent(1);
