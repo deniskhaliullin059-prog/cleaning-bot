@@ -108,6 +108,26 @@
   </div>
 </div>
 
+<!-- Аналитика: воронка + топ клиентов -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+
+  <!-- Воронка конверсии -->
+  <div class="bg-white rounded-xl p-5 shadow-sm">
+    <div class="font-semibold text-sm text-slate-700 mb-4">Воронка конверсии</div>
+    <div id="funnel-container" class="space-y-3"></div>
+  </div>
+
+  <!-- Топ клиентов по LTV -->
+  <div class="bg-white rounded-xl p-5 shadow-sm">
+    <div class="flex items-center justify-between mb-4">
+      <div class="font-semibold text-sm text-slate-700">Топ клиентов по выручке</div>
+      <div class="text-xs text-slate-500">Средний чек: <span id="s-avg-check" class="font-semibold text-slate-700">—</span></div>
+    </div>
+    <div id="ltv-list" class="space-y-2"></div>
+  </div>
+
+</div>
+
 <!-- Последние заявки -->
 <div class="bg-white rounded-xl shadow-sm">
   <div class="px-5 py-4 border-b border-slate-100 font-semibold text-sm text-slate-700">Последние заявки</div>

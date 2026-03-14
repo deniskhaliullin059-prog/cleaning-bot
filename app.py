@@ -311,6 +311,48 @@ def api_stats():
             "created_at": r["created_at"],
         })
 
+    # Воронка конверсии
+    c.execute("SELECT COUNT(DISTINCT user_id) FROM messages WHERE direction='in'")
+    funnel_leads = c.fetchone()[0]
+    funnel_orders = total_count
+    funnel_done = statuses.get("done", 0)
+    funnel_cancelled = statuses.get("cancelled", 0)
+    funnel = {
+        "leads": funnel_leads,
+        "orders": funnel_orders,
+        "done": funnel_done,
+        "cancelled": funnel_cancelled,
+        "conv_order": round(funnel_orders / funnel_leads * 100, 1) if funnel_leads else 0,
+        "conv_done": round(funnel_done / funnel_orders * 100, 1) if funnel_orders else 0,
+    }
+
+    # Средний чек (по заявкам с ценой)
+    c.execute("SELECT AVG(price) FROM orders WHERE price IS NOT NULL AND price > 0")
+    avg_check = c.fetchone()[0]
+    avg_check = int(avg_check) if avg_check else 0
+
+    # Топ клиентов по LTV (суммарная выручка)
+    c.execute("""
+        SELECT name,
+               COUNT(*) as orders_count,
+               COALESCE(SUM(price), 0) as ltv,
+               COALESCE(AVG(price), 0) as avg_price
+        FROM orders
+        WHERE name IS NOT NULL AND name != ''
+        GROUP BY user_id
+        ORDER BY ltv DESC
+        LIMIT 10
+    """)
+    top_clients = [
+        {
+            "name": r["name"],
+            "orders": r["orders_count"],
+            "ltv": int(r["ltv"]),
+            "avg_check": int(r["avg_price"]),
+        }
+        for r in c.fetchall()
+    ]
+
     conn.close()
     return jsonify({
         "today_count": today_count,
@@ -325,6 +367,9 @@ def api_stats():
         "services_data": services_data,
         "statuses": statuses,
         "recent": recent,
+        "funnel": funnel,
+        "avg_check": avg_check,
+        "top_clients": top_clients,
     })
 
 

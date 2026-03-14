@@ -100,6 +100,58 @@ async function loadStats() {
     }
   });
 
+  // Средний чек
+  const avgCheckEl = document.getElementById('s-avg-check');
+  if (avgCheckEl) avgCheckEl.textContent = d.avg_check ? fmtRub(d.avg_check) : '—';
+
+  // Воронка конверсии
+  const f = d.funnel || {};
+  const funnelSteps = [
+    { label: 'Лидов (написали боту)', value: f.leads || 0, color: 'bg-indigo-500', pct: 100 },
+    { label: `Заявок оформлено (${f.conv_order || 0}%)`, value: f.orders || 0, color: 'bg-blue-500', pct: f.conv_order || 0 },
+    { label: `Выполнено (${f.conv_done || 0}% от заявок)`, value: f.done || 0, color: 'bg-emerald-500', pct: f.orders ? Math.round(f.done / f.leads * 100) : 0 },
+    { label: 'Отменено', value: f.cancelled || 0, color: 'bg-red-400', pct: f.leads ? Math.round((f.cancelled || 0) / f.leads * 100) : 0 },
+  ];
+  const funnelContainer = document.getElementById('funnel-container');
+  if (funnelContainer) {
+    funnelContainer.innerHTML = funnelSteps.map(step => `
+      <div>
+        <div class="flex justify-between text-xs text-slate-600 mb-1">
+          <span>${step.label}</span>
+          <span class="font-semibold">${step.value}</span>
+        </div>
+        <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+          <div class="${step.color} h-2 rounded-full transition-all" style="width:${Math.min(step.pct, 100)}%"></div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // Топ клиентов по LTV
+  const ltvList = document.getElementById('ltv-list');
+  if (ltvList) {
+    if (!d.top_clients || !d.top_clients.length) {
+      ltvList.innerHTML = '<div class="text-sm text-slate-400 text-center py-4">Нет данных</div>';
+    } else {
+      const maxLtv = d.top_clients[0].ltv || 1;
+      ltvList.innerHTML = d.top_clients.map((c, i) => `
+        <div class="flex items-center gap-3">
+          <div class="text-xs text-slate-400 w-4 shrink-0">${i + 1}</div>
+          <div class="flex-1 min-w-0">
+            <div class="flex justify-between text-xs mb-0.5">
+              <span class="font-medium text-slate-700 truncate">${c.name || '—'}</span>
+              <span class="text-emerald-600 font-semibold shrink-0 ml-2">${fmtRub(c.ltv)}</span>
+            </div>
+            <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+              <div class="bg-emerald-400 h-1.5 rounded-full" style="width:${Math.round(c.ltv / maxLtv * 100)}%"></div>
+            </div>
+            <div class="text-xs text-slate-400 mt-0.5">${c.orders} заказ · ср. чек ${fmtRub(c.avg_check)}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+  }
+
   // Таблица
   const tbody = document.getElementById('recent-tbody');
   if (!d.recent.length) {
