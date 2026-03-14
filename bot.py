@@ -557,22 +557,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # сохранить входящее сообщение
     save_message(user_id, user_name, "in", user_text)
 
-    # Перехват вопросов про реферальную программу — LLM даёт неверный ответ про сайт
-    if any(kw in user_text.lower() for kw in ("реферальн", "реферал", "пригласить", "привести клиента", "скидку за", "ссылку для", "своих клиентов", "партнёрск", "партнерск")):
-        bot_me = await context.bot.get_me()
-        ref_link_hint = f"https://t.me/{bot_me.username}?start=ref_{user_id}"
-        ref_reply = (
-            "Реферальная программа работает прямо здесь, в боте.\n\n"
-            "Напишите команду /myref — и получите вашу персональную ссылку.\n\n"
-            f"Или вот она прямо сейчас:\n{ref_link_hint}\n\n"
-            "За каждого нового клиента, пришедшего по вашей ссылке, вы получаете скидку 5% на следующую уборку."
-        )
-        conversations[user_id].append({"role": "user", "content": user_text})
-        conversations[user_id].append({"role": "assistant", "content": ref_reply})
-        save_message(user_id, "ООО ВИД", "out", ref_reply)
-        await update.message.reply_text(ref_reply)
-        return
-
     loyal = is_loyal_client(user_id)
     loyal_system = "ПОСТОЯННЫЙ_КЛИЕНТ=ДА — применяй скидку 10% и сообщи об этом клиенту." if loyal else "ПОСТОЯННЫЙ_КЛИЕНТ=НЕТ"
 
@@ -736,6 +720,29 @@ async def handle_photo(update: Update, _context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(reply)
 
 
+async def handle_referral_question(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.id == ADMIN_GROUP_ID:
+        return
+    user_id = update.effective_user.id
+    user_name = update.effective_user.full_name or str(user_id)
+    user_text = update.message.text or ""
+    save_message(user_id, user_name, "in", user_text)
+    bot_me = await context.bot.get_me()
+    ref_link = f"https://t.me/{bot_me.username}?start=ref_{user_id}"
+    reply = (
+        "Реферальная программа работает прямо здесь, в боте.\n\n"
+        f"Ваша реферальная ссылка:\n{ref_link}\n\n"
+        "За каждого нового клиента по вашей ссылке — скидка 5% на следующую уборку.\n"
+        "Или напишите /myref в любой момент, чтобы получить ссылку снова."
+    )
+    if user_id not in conversations:
+        conversations[user_id] = []
+    conversations[user_id].append({"role": "user", "content": user_text})
+    conversations[user_id].append({"role": "assistant", "content": reply})
+    save_message(user_id, "ООО ВИД", "out", reply)
+    await update.message.reply_text(reply)
+
+
 async def reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     conversations[user_id] = []
@@ -753,6 +760,10 @@ def main():
     app.add_handler(CallbackQueryHandler(handle_book_new, pattern=r"^book_new$"))
     app.add_handler(CallbackQueryHandler(handle_rating, pattern=r"^rate_"))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    app.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND & filters.Regex(r'(?i)реферал'),
+        handle_referral_question
+    ))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     logger.info("ООО ВИД бот запущен!")
     app.run_polling()
