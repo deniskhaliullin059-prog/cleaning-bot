@@ -592,6 +592,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     loyal_system = "Клиент постоянный (3+ заказа). Применяй скидку 10% и сообщи об этом клиенту." if loyal else "Клиент новый, скидка не применяется. Не упоминай это клиенту."
 
     conversations[user_id].append({"role": "user", "content": user_text})
+    if len(conversations[user_id]) > 20:
+        conversations[user_id] = conversations[user_id][-20:]
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
     try:
         messages = [
