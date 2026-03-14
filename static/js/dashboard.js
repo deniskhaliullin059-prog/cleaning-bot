@@ -152,27 +152,59 @@ async function loadStats() {
     }
   }
 
-  // Таблица
+}
+
+// ─── Таблица заявок с пагинацией ─────────────────────────────────────────────
+
+let currentPage = 1;
+
+async function loadRecent(page) {
+  currentPage = page;
+  const res = await fetch(`/api/recent?page=${page}`);
+  const d = await res.json();
   const tbody = document.getElementById('recent-tbody');
-  if (!d.recent.length) {
+  const totalPages = Math.ceil(d.total / d.per_page);
+
+  document.getElementById('recent-info').textContent =
+    `${d.total} заявок · стр. ${d.page} из ${totalPages || 1}`;
+
+  if (!d.orders.length) {
     tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-slate-400">Заявок пока нет</td></tr>';
-    return;
+  } else {
+    tbody.innerHTML = d.orders.map(r => `
+      <tr>
+        <td class="text-slate-400">#${r.id}</td>
+        <td>
+          <div class="font-medium">${r.name || '—'}</div>
+          <div class="text-xs text-slate-400">${r.phone || ''}</div>
+        </td>
+        <td class="text-slate-600">${r.service || '—'}</td>
+        <td class="text-slate-500 text-xs">${r.address || '—'}</td>
+        <td class="text-slate-500 text-xs">${r.date || '—'}</td>
+        <td><span class="badge badge-${r.status}">${STATUS_LABELS[r.status] || r.status}</span></td>
+        <td class="text-amber-500">${r.rating ? '★'.repeat(r.rating) : '—'}</td>
+      </tr>
+    `).join('');
   }
-  tbody.innerHTML = d.recent.map(r => `
-    <tr>
-      <td class="text-slate-400">#${r.id}</td>
-      <td>
-        <div class="font-medium">${r.name || '—'}</div>
-        <div class="text-xs text-slate-400">${r.phone || ''}</div>
-      </td>
-      <td class="text-slate-600">${r.service || '—'}</td>
-      <td class="text-slate-500 text-xs">${r.address || '—'}</td>
-      <td class="text-slate-500 text-xs">${r.date || '—'}</td>
-      <td><span class="badge badge-${r.status}">${STATUS_LABELS[r.status] || r.status}</span></td>
-      <td class="text-amber-500">${r.rating ? '★'.repeat(r.rating) : '—'}</td>
-    </tr>
+
+  document.getElementById('page-prev').disabled = page <= 1;
+  document.getElementById('page-next').disabled = page >= totalPages;
+
+  const nums = document.getElementById('page-numbers');
+  const start = Math.max(1, page - 2);
+  const end = Math.min(totalPages, start + 4);
+  nums.innerHTML = Array.from({ length: end - start + 1 }, (_, i) => start + i).map(p => `
+    <button onclick="loadRecent(${p})"
+      class="w-8 h-8 text-xs rounded-lg ${p === page ? 'bg-indigo-600 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}">
+      ${p}
+    </button>
   `).join('');
 }
 
+function changePage(delta) {
+  loadRecent(currentPage + delta);
+}
+
 loadStats();
+loadRecent(1);
 setInterval(loadStats, 30000);

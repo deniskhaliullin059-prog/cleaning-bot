@@ -792,6 +792,34 @@ def api_broadcast():
     return jsonify({"ok": True, "sent": sent, "failed": failed, "total": len(user_ids)})
 
 
+# ─── API: Последние заявки (пагинация) ───────────────────────────────────────
+
+@app.route("/api/recent")
+@login_required
+def api_recent():
+    per_page = 10
+    page = max(1, int(request.args.get("page", 1)))
+    offset = (page - 1) * per_page
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM orders")
+    total = c.fetchone()[0]
+    c.execute("""
+        SELECT id, name, phone, service, address, date, status, rating
+        FROM orders ORDER BY id DESC LIMIT ? OFFSET ?
+    """, (per_page, offset))
+    orders = []
+    for r in c.fetchall():
+        orders.append({
+            "id": r["id"], "name": r["name"], "phone": r["phone"],
+            "service": r["service"], "address": r["address"],
+            "date": r["date"], "status": r["status"] or "new",
+            "rating": r["rating"],
+        })
+    conn.close()
+    return jsonify({"orders": orders, "total": total, "page": page, "per_page": per_page})
+
+
 # ─── API: Статус бота ────────────────────────────────────────────────────────
 
 @app.route("/api/bot/status")

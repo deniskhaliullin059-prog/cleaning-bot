@@ -130,7 +130,10 @@
 
 <!-- Последние заявки -->
 <div class="bg-white rounded-xl shadow-sm">
-  <div class="px-5 py-4 border-b border-slate-100 font-semibold text-sm text-slate-700">Последние заявки</div>
+  <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+    <div class="font-semibold text-sm text-slate-700">Все заявки</div>
+    <div class="text-xs text-slate-400" id="recent-info"></div>
+  </div>
   <div class="overflow-x-auto">
     <table class="data-table">
       <thead>
@@ -142,6 +145,17 @@
         <tr><td colspan="7" class="text-center py-8 text-slate-400">Загрузка...</td></tr>
       </tbody>
     </table>
+  </div>
+  <div class="px-5 py-3 border-t border-slate-100 flex items-center justify-between">
+    <button id="page-prev" onclick="changePage(-1)"
+      class="px-3 py-1.5 text-sm rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition">
+      ← Назад
+    </button>
+    <div id="page-numbers" class="flex gap-1"></div>
+    <button id="page-next" onclick="changePage(1)"
+      class="px-3 py-1.5 text-sm rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition">
+      Вперёд →
+    </button>
   </div>
 </div>
 {% endblock %}
